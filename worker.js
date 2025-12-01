@@ -960,10 +960,11 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     <div class="footer">
       <div class="stats">
-        <span class="stat-item">访客数：<span id="busuanzi_value_site_uv">--</span></span>
+        <span class="stat-item">访客数 (UV)：<span id="totalVisitors">--</span></span>
+        <span class="stat-item">访问量 (PV)：<span id="totalPageViews">--</span></span>
       </div>
       <div class="links">
-        <a href="stats.html">访客统计</a>
+        <a href="stats.html">访客统计详情</a>
         <a href="https://url.hxorz.cn" target="_blank">开发者工具代理加速</a>
         <a href="https://game.hxorz.cn" target="_blank">休闲小游戏</a>
       </div>
@@ -976,7 +977,6 @@ const INDEX_HTML = `<!DOCTYPE html>
     </div>
   </div>
 
-  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   <script src="https://giscus.app/client.js"
         data-repo="inwpu/dd"
         data-repo-id="R_kgDOQgDKSg"
@@ -1455,6 +1455,23 @@ const INDEX_HTML = `<!DOCTYPE html>
     // 设置查询表单的最小日期为今天
     document.getElementById('queryDate').min = new Date().toISOString().split('T')[0];
     document.getElementById('routeDate').min = new Date().toISOString().split('T')[0];
+
+    // 加载访客统计数据
+    async function loadVisitorStats() {
+      try {
+        const response = await fetch(\`\${API_BASE}/api/stats\`);
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById('totalVisitors').textContent = data.totalVisitors.toLocaleString();
+          document.getElementById('totalPageViews').textContent = data.totalPageViews.toLocaleString();
+        }
+      } catch (error) {
+        console.error('加载访客统计失败:', error);
+      }
+    }
+
+    // 页面加载时获取统计
+    loadVisitorStats();
   </script>
 </body>
 </html>
