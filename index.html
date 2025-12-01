@@ -582,6 +582,19 @@
       font-size: 0.9em;
     }
 
+    /* Giscus 评论框样式 */
+    #comments {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    #comments .giscus,
+    #comments .giscus-frame {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
     @media (max-width: 768px) {
       body {
         padding: 10px;
@@ -906,7 +919,7 @@
             <div class="qr-popup-inner">
               <div class="qr-popup-label">微信扫码赞赏</div>
               <div class="qr-image-wrapper">
-                <img src="images/wechhat.jpg" alt="微信赞赏码" class="qr-image">
+                <img src="https://dd.snnuisdc.workers.dev/images/wechhat.jpg" alt="微信赞赏码" class="qr-image">
               </div>
             </div>
           </div>
@@ -917,7 +930,7 @@
             <div class="qr-popup-inner">
               <div class="qr-popup-label">支付宝扫码赞赏</div>
               <div class="qr-image-wrapper">
-                <img src="images/alipay.jpg" alt="支付宝赞赏码" class="qr-image">
+                <img src="https://dd.snnuisdc.workers.dev/images/alipay.jpg" alt="支付宝赞赏码" class="qr-image">
               </div>
             </div>
           </div>
@@ -930,7 +943,6 @@
     <div class="footer">
       <div class="stats">
         <span class="stat-item">访客数：<span id="busuanzi_value_site_uv">--</span></span>
-        <span class="stat-item">访问量：<span id="busuanzi_value_site_pv">--</span></span>
       </div>
       <div class="links">
         <a href="stats.html">访客统计</a>

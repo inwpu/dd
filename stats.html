@@ -159,10 +159,6 @@
       color: #8b0000;
     }
 
-    .ip-masked {
-      font-family: monospace;
-      color: #666;
-    }
 
     .footer {
       text-align: center;
@@ -231,24 +227,19 @@
     <div id="statsContent" style="display: none;">
       <div class="stats-overview">
         <div class="stat-card">
-          <div class="stat-number" id="totalVisits">--</div>
-          <div class="stat-label">总访问次数</div>
-        </div>
-        <div class="stat-card">
           <div class="stat-number" id="totalVisitors">--</div>
           <div class="stat-label">总访客数</div>
         </div>
       </div>
 
       <div class="table-container">
-        <h2>访客归属地排名</h2>
+        <h2>访客列表（按访问时间排序）</h2>
         <table>
           <thead>
             <tr>
-              <th style="width: 80px;">排名</th>
-              <th style="width: 150px;">IP地址</th>
+              <th style="width: 80px;">序号</th>
+              <th style="width: 180px;">IP地址</th>
               <th>归属地</th>
-              <th style="width: 120px;">访问次数</th>
             </tr>
           </thead>
           <tbody id="locationTable">
@@ -302,22 +293,18 @@
 
         const data = await response.json();
 
-        document.getElementById('totalVisits').textContent = data.totalVisits.toLocaleString();
         document.getElementById('totalVisitors').textContent = data.totalVisitors.toLocaleString();
 
         const tableBody = document.getElementById('locationTable');
         tableBody.innerHTML = data.topLocations.map((item, index) => {
-          const rank = index + 1;
-          const rankClass = rank <= 3 ? `rank rank-${rank}` : 'rank';
-          const maskedIP = maskIP(item.ip);
+          const num = index + 1;
           const location = formatLocation(item.city, item.country);
 
           return `
             <tr>
-              <td class="${rankClass}">${rank}</td>
-              <td class="ip-masked">${maskedIP}</td>
+              <td class="rank">${num}</td>
+              <td>${item.ip}</td>
               <td>${location}</td>
-              <td>${item.count.toLocaleString()}</td>
             </tr>
           `;
         }).join('');
@@ -332,19 +319,6 @@
         errorDiv.textContent = '加载统计数据失败，请稍后重试';
         errorDiv.style.display = 'block';
       }
-    }
-
-    function maskIP(ip) {
-      const parts = ip.split('.');
-      if (parts.length === 4) {
-        return `${parts[0]}.${parts[1]}.${parts[2].replace(/./g, '*')}.${parts[3].replace(/./g, '*')}`;
-      }
-      // IPv6简单处理
-      if (ip.includes(':')) {
-        const segments = ip.split(':');
-        return segments.slice(0, 3).join(':') + ':****';
-      }
-      return ip.slice(0, -4) + '****';
     }
 
     function formatLocation(city, country) {

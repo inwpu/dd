@@ -1,5 +1,5 @@
 name = "dd"
-main = "worker.js"
+main = "dist/worker.js"
 compatibility_date = "2025-12-01"
 
 # D1 数据库绑定

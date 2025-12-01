@@ -46,7 +46,21 @@ export default {
       await trackVisitor(request, ip, ua, env);
 
       // 路由
-      if (url.pathname === '/api/search') {
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        return new Response(INDEX_HTML, {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+          }
+        });
+      } else if (url.pathname === '/stats.html') {
+        return new Response(STATS_HTML, {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+          }
+        });
+      } else if (url.pathname === '/api/search') {
         return handleSearch(request, env);
       } else if (url.pathname === '/api/resolve-poi') {
         return handleResolvePOI(request, env);
@@ -308,26 +322,20 @@ async function handleMatch(request, env, ip) {
 
 // 访客统计
 async function handleStats(env) {
-  // 总访问次数
-  const totalVisits = await env.DB.prepare(
-    'SELECT SUM(count) as total FROM visitors'
-  ).first();
-
   // 总访客数
   const totalVisitors = await env.DB.prepare(
     'SELECT COUNT(*) as total FROM visitors'
   ).first();
 
-  // IP归属地排名
+  // IP归属地排名（按最后访问时间排序）
   const topLocations = await env.DB.prepare(`
-    SELECT ip, country, city, count
+    SELECT ip, country, city
     FROM visitors
-    ORDER BY count DESC
+    ORDER BY last_visit DESC
     LIMIT 50
   `).all();
 
   return jsonResponse({
-    totalVisits: totalVisits.total || 0,
     totalVisitors: totalVisitors.total || 0,
     topLocations: topLocations.results
   });

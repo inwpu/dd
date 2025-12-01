@@ -1,0 +1,13 @@
+{
+  "name": "xian-carpool",
+  "version": "1.0.0",
+  "description": "西安大学生拼车平台 Cloudflare Worker",
+  "scripts": {
+    "build": "node build.js",
+    "deploy": "node build.js && wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "keywords": ["cloudflare", "worker", "carpool"],
+  "author": "hxorz",
+  "license": "MIT"
+}
