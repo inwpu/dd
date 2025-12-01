@@ -76,6 +76,10 @@ export default {
         return handleStats(env);
       } else if (url.pathname === '/api/cleanup') {
         return handleCleanup(env);
+      } else if (url.pathname === '/images/wechhat.jpg') {
+        return handleImage('wechat');
+      } else if (url.pathname === '/images/alipay.jpg') {
+        return handleImage('alipay');
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
@@ -620,6 +624,26 @@ function jsonResponse(data, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    }
+  });
+}
+
+// 处理图片请求
+function handleImage(type) {
+  const base64Data = type === 'wechat' ? WECHAT_IMG_BASE64 : ALIPAY_IMG_BASE64;
+
+  // 将base64转换为二进制
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return new Response(bytes, {
+    headers: {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'public, max-age=31536000', // 缓存1年
       'Access-Control-Allow-Origin': '*',
     }
   });
