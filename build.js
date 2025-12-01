@@ -18,14 +18,8 @@ const STATS_HTML = \`${statsHtml.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
 // Insert HTML constants at the beginning of the worker
 const bundledWorker = htmlConstants + workerTemplate;
 
-// Ensure dist directory exists
-const distDir = path.join(__dirname, 'dist');
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir, { recursive: true });
-}
-
-// Write the bundled worker
-fs.writeFileSync(path.join(distDir, 'worker.js'), bundledWorker, 'utf-8');
+// Write the bundled worker to root directory
+fs.writeFileSync(path.join(__dirname, 'worker.js'), bundledWorker, 'utf-8');
 
 console.log('✅ Worker bundled successfully!');
-console.log('📦 Output: dist/worker.js');
+console.log('📦 Output: worker.js');
