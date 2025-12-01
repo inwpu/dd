@@ -234,6 +234,12 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
   }
 
+  // 验证手机号格式（宽松规则：1开头的11位数字）
+  const phonePattern = /^1\d{10}$/;
+  if (!phonePattern.test(contact.trim())) {
+    return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
+  }
+
   // 计算时间戳
   const departureDateTime = new Date(`${departure_date}T${departure_time}:00`);
   const departureTimestamp = departureDateTime.getTime();

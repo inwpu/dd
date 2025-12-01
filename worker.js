@@ -861,11 +861,14 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       <div class="form-group">
         <label for="contact">联系方式 *</label>
-        <input type="text" id="contact" required placeholder="手机号（建议开通微信号查找功能）">
+        <input type="tel" id="contact" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
+        <small style="color: #666; display: block; margin-top: 5px;">
+          请输入11位手机号码，建议开通"可通过手机号查找微信"功能
+        </small>
       </div>
 
       <div class="tip">
-        提示：匹配成功后建议优先电话联系，并开通"可通过手机号查找微信"功能方便添加。
+        提示：匹配成功后建议优先电话联系，方便快速沟通。
       </div>
 
       <button type="submit">发布行程并查找拼车</button>
@@ -1181,12 +1184,25 @@ const INDEX_HTML = `<!DOCTYPE html>
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('departureDate').min = today;
 
+    // 手机号验证（宽松规则：仅验证11位数字）
+    function validatePhone(phone) {
+      const phonePattern = /^1\d{10}\$/; // 1开头的11位数字
+      return phonePattern.test(phone);
+    }
+
     // 表单提交
     document.getElementById('tripForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
       if (!selectedLocation) {
         showMessage('请选择有效的目的地', 'error');
+        return;
+      }
+
+      // 验证手机号
+      const contact = document.getElementById('contact').value.trim();
+      if (!validatePhone(contact)) {
+        showMessage('请输入正确的11位手机号（1开头）', 'error');
         return;
       }
 
@@ -2061,6 +2077,12 @@ async function handleCreateTrip(request, env, ip) {
   const timeRangeValue = parseInt(time_range);
   if (![30, 60].includes(timeRangeValue)) {
     return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
+  }
+
+  // 验证手机号格式（宽松规则：1开头的11位数字）
+  const phonePattern = /^1\d{10}$/;
+  if (!phonePattern.test(contact.trim())) {
+    return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
   }
 
   // 计算时间戳
