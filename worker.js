@@ -1671,7 +1671,11 @@ const STATS_HTML = `<!DOCTYPE html>
       <div class="stats-overview">
         <div class="stat-card">
           <div class="stat-number" id="totalVisitors">--</div>
-          <div class="stat-label">总访客数</div>
+          <div class="stat-label">总访客数 (UV)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="totalPageViews">--</div>
+          <div class="stat-label">总访问量 (PV)</div>
         </div>
       </div>
 
@@ -1737,6 +1741,7 @@ const STATS_HTML = `<!DOCTYPE html>
         const data = await response.json();
 
         document.getElementById('totalVisitors').textContent = data.totalVisitors.toLocaleString();
+        document.getElementById('totalPageViews').textContent = data.totalPageViews.toLocaleString();
 
         const tableBody = document.getElementById('locationTable');
         tableBody.innerHTML = data.topLocations.map((item, index) => {
@@ -1859,8 +1864,6 @@ export default {
         return handleStats(env);
       } else if (url.pathname === '/api/cleanup') {
         return handleCleanup(env);
-      } else if (url.pathname === '/api/clear-bans') {
-        return handleClearBans(env);
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
@@ -1870,6 +1873,9 @@ export default {
     }
   }
 };
+
+// 内存中的临时封禁缓存（使用Cloudflare Cache API）
+const IP_BAN_CACHE = new Map(); // 注意：Worker重启后会清空
 
 // 反爬虫检查
 async function checkCrawler(ua, ip, env) {
@@ -1881,28 +1887,26 @@ async function checkCrawler(ua, ip, env) {
     }
   }
 
-  // 检查IP是否被封禁
   const now = Date.now();
-  const ban = await env.DB.prepare(
-    'SELECT banned_until FROM ip_bans WHERE ip = ? AND banned_until > ?'
-  ).bind(ip, now).first();
 
-  if (ban) {
+  // 检查内存缓存中的IP封禁
+  const banUntil = IP_BAN_CACHE.get(ip);
+  if (banUntil && banUntil > now) {
     return { allowed: false, reason: 'IP banned' };
+  } else if (banUntil && banUntil <= now) {
+    // 封禁已过期，删除
+    IP_BAN_CACHE.delete(ip);
   }
 
-  // 访问频率检查
+  // 访问频率检查（查询最近1分钟的PV记录数）
   const oneMinuteAgo = now - 60000;
-  const count = await env.DB.prepare(
-    'SELECT count FROM visitors WHERE ip = ? AND last_visit > ?'
+  const result = await env.DB.prepare(
+    'SELECT COUNT(*) as recent_count FROM page_views WHERE ip = ? AND visit_time > ?'
   ).bind(ip, oneMinuteAgo).first();
 
-  if (count && count.count > MAX_REQUESTS_PER_MINUTE) {
-    // 封禁IP
-    await env.DB.prepare(
-      'INSERT OR REPLACE INTO ip_bans (ip, banned_until, reason) VALUES (?, ?, ?)'
-    ).bind(ip, now + BAN_DURATION, 'Rate limit exceeded').run();
-
+  if (result && result.recent_count > MAX_REQUESTS_PER_MINUTE) {
+    // 在内存中临时封禁IP，24小时后自动过期
+    IP_BAN_CACHE.set(ip, now + BAN_DURATION);
     return { allowed: false, reason: 'Rate limit exceeded' };
   }
 
@@ -1916,16 +1920,22 @@ async function trackVisitor(request, ip, ua, env) {
   const city = cf.city || 'Unknown';
   const now = Date.now();
 
+  // 更新UV（独立访客）：每个IP只记录一次
   await env.DB.prepare(`
-    INSERT INTO visitors (ip, ua, country, city, count, last_visit)
-    VALUES (?, ?, ?, ?, 1, ?)
+    INSERT INTO visitors (ip, ua, country, city, last_visit)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(ip) DO UPDATE SET
-      count = count + 1,
       last_visit = ?,
       ua = ?,
       country = ?,
       city = ?
   `).bind(ip, ua, country, city, now, now, ua, country, city).run();
+
+  // 记录PV（页面浏览量）：每次访问都记录
+  await env.DB.prepare(`
+    INSERT INTO page_views (ip, visit_time, path, ua)
+    VALUES (?, ?, ?, ?)
+  `).bind(ip, now, request.url, ua).run();
 }
 
 // 高德地图搜索API
@@ -2107,9 +2117,14 @@ async function handleMatch(request, env, ip) {
 
 // 访客统计
 async function handleStats(env) {
-  // 总访客数
+  // UV（独立访客数）
   const totalVisitors = await env.DB.prepare(
     'SELECT COUNT(*) as total FROM visitors'
+  ).first();
+
+  // PV（页面浏览量）
+  const totalPageViews = await env.DB.prepare(
+    'SELECT COUNT(*) as total FROM page_views'
   ).first();
 
   // IP归属地排名（按最后访问时间排序）
@@ -2122,6 +2137,7 @@ async function handleStats(env) {
 
   return jsonResponse({
     totalVisitors: totalVisitors.total || 0,
+    totalPageViews: totalPageViews.total || 0,
     topLocations: topLocations.results
   });
 }
@@ -2334,16 +2350,6 @@ async function recordQueryAttempt(ip, env) {
 async function handleCleanup(env) {
   const deleted = await cleanupExpiredTrips(env);
   return jsonResponse({ deleted });
-}
-
-// 清理所有IP封禁（临时管理接口）
-async function handleClearBans(env) {
-  const result = await env.DB.prepare('DELETE FROM ip_bans').run();
-  return jsonResponse({
-    success: true,
-    cleared: result.meta.changes,
-    message: 'All IP bans have been cleared'
-  });
 }
 
 async function cleanupExpiredTrips(env) {
