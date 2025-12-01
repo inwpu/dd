@@ -42,11 +42,10 @@ export default {
         return jsonResponse({ error: crawlerCheck.reason }, 403);
       }
 
-      // 访客统计
-      await trackVisitor(request, ip, ua, env);
-
       // 路由
       if (url.pathname === '/' || url.pathname === '/index.html') {
+        // 访客统计（只在访问HTML页面时统计）
+        await trackVisitor(request, ip, ua, env);
         return new Response(INDEX_HTML, {
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
@@ -54,6 +53,8 @@ export default {
           }
         });
       } else if (url.pathname === '/stats.html') {
+        // 访客统计（只在访问HTML页面时统计）
+        await trackVisitor(request, ip, ua, env);
         return new Response(STATS_HTML, {
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
