@@ -6,7 +6,7 @@ const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
 const statsHtml = fs.readFileSync(path.join(__dirname, 'stats.html'), 'utf-8');
 
 // Read worker template
-const workerTemplate = fs.readFileSync(path.join(__dirname, 'worker.js'), 'utf-8');
+const workerTemplate = fs.readFileSync(path.join(__dirname, 'worker.source.js'), 'utf-8');
 
 // Create constants for HTML files
 const htmlConstants = `
