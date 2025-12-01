@@ -795,6 +795,12 @@ const INDEX_HTML = `<!DOCTYPE html>
       <p>本平台为西安地区大学生提供免费拼车信息匹配服务，帮助同学们找到同路出行的伙伴，降低出行成本。</p>
       <p style="margin-top: 8px;"><strong>数据保留政策：</strong>行程信息仅保留未来7天（从行程当天起算），7天后数据将自动清理。请勿录入7天后的行程，系统将自动拒绝。</p>
       <p style="margin-top: 8px;"><strong>隐私提示：</strong>只有发布行程的用户才能查看其他人的联系方式，仅查询不会显示联系方式。</p>
+      <p style="margin-top: 8px;"><strong>匹配规则：</strong></p>
+      <ul style="margin-left: 20px; margin-top: 5px;">
+        <li>出发时间在您设定的时间范围内（±30分钟或±1小时）</li>
+        <li>目的地距离您的目的地≤1公里</li>
+        <li>最多显示2个匹配结果</li>
+      </ul>
     </div>
 
     <div class="tabs">
@@ -832,6 +838,17 @@ const INDEX_HTML = `<!DOCTYPE html>
           <input type="date" id="departureDate" required>
           <input type="time" id="departureTime" required>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label for="timeRange">可接受的出发时间范围 *</label>
+        <select id="timeRange" required>
+          <option value="30">前后30分钟内（推荐，匹配更精确）</option>
+          <option value="60">前后1小时内（匹配范围更广）</option>
+        </select>
+        <small style="color: #666; display: block; margin-top: 5px;">
+          例如：您选择14:00出发，选择"前后30分钟"，则会匹配13:30-14:30之间出发的行程
+        </small>
       </div>
 
       <div class="form-group">
@@ -1183,7 +1200,8 @@ const INDEX_HTML = `<!DOCTYPE html>
         location_name: selectedLocation.name,
         departure_date: document.getElementById('departureDate').value,
         departure_time: document.getElementById('departureTime').value,
-        contact: document.getElementById('contact').value.trim()
+        contact: document.getElementById('contact').value.trim(),
+        time_range: parseInt(document.getElementById('timeRange').value)
       };
 
       document.getElementById('loading').style.display = 'block';
@@ -2006,11 +2024,17 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, school, campus, college, lat, lon, location_name, departure_date, departure_time, contact } = body;
+  const { name, school, campus, college, lat, lon, location_name, departure_date, departure_time, contact, time_range } = body;
 
   // 验证必填字段
-  if (!name || !school || !lat || !lon || !location_name || !departure_date || !departure_time || !contact) {
+  if (!name || !school || !lat || !lon || !location_name || !departure_date || !departure_time || !contact || !time_range) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
+  }
+
+  // 验证time_range值
+  const timeRangeValue = parseInt(time_range);
+  if (![30, 60].includes(timeRangeValue)) {
+    return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
   }
 
   // 计算时间戳
@@ -2028,11 +2052,11 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '仅支持未来7天内的行程，请勿录入7天后的行程' }, 400);
   }
 
-  // 插入数据库（包含IP）
+  // 插入数据库（包含IP和时间范围）
   const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, lat, lon, location_name, departure_date, departure_time, departure_timestamp, contact, ip, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(name, school, campus || '', college || '', lat, lon, location_name, departure_date, departure_time, departureTimestamp, contact, ip, now).run();
+    INSERT INTO trips (name, school, campus, college, lat, lon, location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(name, school, campus || '', college || '', lat, lon, location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, now).run();
 
   // 清理过期数据
   await cleanupExpiredTrips(env);
@@ -2087,11 +2111,12 @@ async function handleMatch(request, env, ip) {
   const userLat = userTrip.lat;
   const userLon = userTrip.lon;
   const userTimestamp = userTrip.departure_timestamp;
+  const userTimeRange = userTrip.time_range || 60; // 默认60分钟
 
-  // 时间范围：±1小时
-  const oneHour = 60 * 60 * 1000;
-  const minTime = userTimestamp - oneHour;
-  const maxTime = userTimestamp + oneHour;
+  // 时间范围：根据用户选择的时间范围（±30分钟或±1小时）
+  const timeRangeMs = userTimeRange * 60 * 1000; // 转换为毫秒
+  const minTime = userTimestamp - timeRangeMs;
+  const maxTime = userTimestamp + timeRangeMs;
 
   // 查询时间范围内的行程（排除自己的）
   const trips = await env.DB.prepare(`

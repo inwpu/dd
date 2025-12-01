@@ -794,6 +794,12 @@
       <p>本平台为西安地区大学生提供免费拼车信息匹配服务，帮助同学们找到同路出行的伙伴，降低出行成本。</p>
       <p style="margin-top: 8px;"><strong>数据保留政策：</strong>行程信息仅保留未来7天（从行程当天起算），7天后数据将自动清理。请勿录入7天后的行程，系统将自动拒绝。</p>
       <p style="margin-top: 8px;"><strong>隐私提示：</strong>只有发布行程的用户才能查看其他人的联系方式，仅查询不会显示联系方式。</p>
+      <p style="margin-top: 8px;"><strong>匹配规则：</strong></p>
+      <ul style="margin-left: 20px; margin-top: 5px;">
+        <li>出发时间在您设定的时间范围内（±30分钟或±1小时）</li>
+        <li>目的地距离您的目的地≤1公里</li>
+        <li>最多显示2个匹配结果</li>
+      </ul>
     </div>
 
     <div class="tabs">
@@ -831,6 +837,17 @@
           <input type="date" id="departureDate" required>
           <input type="time" id="departureTime" required>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label for="timeRange">可接受的出发时间范围 *</label>
+        <select id="timeRange" required>
+          <option value="30">前后30分钟内（推荐，匹配更精确）</option>
+          <option value="60">前后1小时内（匹配范围更广）</option>
+        </select>
+        <small style="color: #666; display: block; margin-top: 5px;">
+          例如：您选择14:00出发，选择"前后30分钟"，则会匹配13:30-14:30之间出发的行程
+        </small>
       </div>
 
       <div class="form-group">
@@ -1182,7 +1199,8 @@
         location_name: selectedLocation.name,
         departure_date: document.getElementById('departureDate').value,
         departure_time: document.getElementById('departureTime').value,
-        contact: document.getElementById('contact').value.trim()
+        contact: document.getElementById('contact').value.trim(),
+        time_range: parseInt(document.getElementById('timeRange').value)
       };
 
       document.getElementById('loading').style.display = 'block';

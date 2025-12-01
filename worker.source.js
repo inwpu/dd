@@ -216,11 +216,17 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, school, campus, college, lat, lon, location_name, departure_date, departure_time, contact } = body;
+  const { name, school, campus, college, lat, lon, location_name, departure_date, departure_time, contact, time_range } = body;
 
   // 验证必填字段
-  if (!name || !school || !lat || !lon || !location_name || !departure_date || !departure_time || !contact) {
+  if (!name || !school || !lat || !lon || !location_name || !departure_date || !departure_time || !contact || !time_range) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
+  }
+
+  // 验证time_range值
+  const timeRangeValue = parseInt(time_range);
+  if (![30, 60].includes(timeRangeValue)) {
+    return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
   }
 
   // 计算时间戳
@@ -238,11 +244,11 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '仅支持未来7天内的行程，请勿录入7天后的行程' }, 400);
   }
 
-  // 插入数据库（包含IP）
+  // 插入数据库（包含IP和时间范围）
   const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, lat, lon, location_name, departure_date, departure_time, departure_timestamp, contact, ip, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(name, school, campus || '', college || '', lat, lon, location_name, departure_date, departure_time, departureTimestamp, contact, ip, now).run();
+    INSERT INTO trips (name, school, campus, college, lat, lon, location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(name, school, campus || '', college || '', lat, lon, location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, now).run();
 
   // 清理过期数据
   await cleanupExpiredTrips(env);
@@ -297,11 +303,12 @@ async function handleMatch(request, env, ip) {
   const userLat = userTrip.lat;
   const userLon = userTrip.lon;
   const userTimestamp = userTrip.departure_timestamp;
+  const userTimeRange = userTrip.time_range || 60; // 默认60分钟
 
-  // 时间范围：±1小时
-  const oneHour = 60 * 60 * 1000;
-  const minTime = userTimestamp - oneHour;
-  const maxTime = userTimestamp + oneHour;
+  // 时间范围：根据用户选择的时间范围（±30分钟或±1小时）
+  const timeRangeMs = userTimeRange * 60 * 1000; // 转换为毫秒
+  const minTime = userTimestamp - timeRangeMs;
+  const maxTime = userTimestamp + timeRangeMs;
 
   // 查询时间范围内的行程（排除自己的）
   const trips = await env.DB.prepare(`
