@@ -997,7 +997,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   </script>
 
   <script>
-    const API_BASE = 'https://dd.snnuisdc.workers.dev'; // Worker URL，部署后填写
+    const API_BASE = (window.location && window.location.origin) || 'https://dd.snnuisdc.workers.dev';
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
 
     let currentTripId = null; // 保存用户发布的行程ID
@@ -1758,7 +1758,7 @@ const STATS_HTML = `<!DOCTYPE html>
   </div>
 
   <script>
-    const API_BASE = 'https://dd.snnuisdc.workers.dev'; // Worker URL
+    const API_BASE = (window.location && window.location.origin) || 'https://dd.snnuisdc.workers.dev';
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
 
     // 网站运行时间计算
