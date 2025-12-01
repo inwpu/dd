@@ -1186,7 +1186,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     // 手机号验证（宽松规则：仅验证11位数字）
     function validatePhone(phone) {
-      const phonePattern = /^1\d{10}\$/; // 1开头的11位数字
+      const phonePattern = /^1\d{10}$/; // 1开头的11位数字
       return phonePattern.test(phone);
     }
 
