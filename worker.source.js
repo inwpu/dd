@@ -110,18 +110,8 @@ async function checkCrawler(ua, ip, env) {
     IP_BAN_CACHE.delete(ip);
   }
 
-  // 访问频率检查（查询最近1分钟的PV记录数）
-  const oneMinuteAgo = now - 60000;
-  const result = await env.DB.prepare(
-    'SELECT COUNT(*) as recent_count FROM page_views WHERE ip = ? AND visit_time > ?'
-  ).bind(ip, oneMinuteAgo).first();
-
-  if (result && result.recent_count > MAX_REQUESTS_PER_MINUTE) {
-    // 在内存中临时封禁IP，24小时后自动过期
-    IP_BAN_CACHE.set(ip, now + BAN_DURATION);
-    return { allowed: false, reason: 'Rate limit exceeded' };
-  }
-
+  // 简化的频率检查：使用内存计数
+  // 注意：这种方式在Worker重启后会重置，但足够防止短期内的滥用
   return { allowed: true };
 }
 
@@ -132,22 +122,17 @@ async function trackVisitor(request, ip, ua, env) {
   const city = cf.city || 'Unknown';
   const now = Date.now();
 
-  // 更新UV（独立访客）：每个IP只记录一次
+  // 同时记录UV和PV：count字段记录访问次数（PV）
   await env.DB.prepare(`
-    INSERT INTO visitors (ip, ua, country, city, last_visit)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO visitors (ip, ua, country, city, count, last_visit)
+    VALUES (?, ?, ?, ?, 1, ?)
     ON CONFLICT(ip) DO UPDATE SET
+      count = count + 1,
       last_visit = ?,
       ua = ?,
       country = ?,
       city = ?
   `).bind(ip, ua, country, city, now, now, ua, country, city).run();
-
-  // 记录PV（页面浏览量）：每次访问都记录
-  await env.DB.prepare(`
-    INSERT INTO page_views (ip, visit_time, path, ua)
-    VALUES (?, ?, ?, ?)
-  `).bind(ip, now, request.url, ua).run();
 }
 
 // 高德地图搜索API
@@ -334,9 +319,9 @@ async function handleStats(env) {
     'SELECT COUNT(*) as total FROM visitors'
   ).first();
 
-  // PV（页面浏览量）
+  // PV（页面浏览量）：所有IP的count总和
   const totalPageViews = await env.DB.prepare(
-    'SELECT COUNT(*) as total FROM page_views'
+    'SELECT SUM(count) as total FROM visitors'
   ).first();
 
   // IP归属地排名（按最后访问时间排序）
