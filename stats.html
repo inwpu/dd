@@ -244,6 +244,7 @@
               <th style="width: 80px;">序号</th>
               <th style="width: 180px;">IP地址</th>
               <th>归属地</th>
+              <th style="width: 120px;">访问次数</th>
             </tr>
           </thead>
           <tbody id="locationTable">
@@ -310,6 +311,7 @@
               <td class="rank">${num}</td>
               <td>${item.ip}</td>
               <td>${location}</td>
+              <td style="text-align: center; font-weight: bold; color: #8b4513;">${item.count || 0}</td>
             </tr>
           `;
         }).join('');

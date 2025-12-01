@@ -1687,6 +1687,7 @@ const STATS_HTML = `<!DOCTYPE html>
               <th style="width: 80px;">序号</th>
               <th style="width: 180px;">IP地址</th>
               <th>归属地</th>
+              <th style="width: 120px;">访问次数</th>
             </tr>
           </thead>
           <tbody id="locationTable">
@@ -1753,6 +1754,7 @@ const STATS_HTML = `<!DOCTYPE html>
               <td class="rank">\${num}</td>
               <td>\${item.ip}</td>
               <td>\${location}</td>
+              <td style="text-align: center; font-weight: bold; color: #8b4513;">\${item.count || 0}</td>
             </tr>
           \`;
         }).join('');
@@ -1874,8 +1876,24 @@ export default {
   }
 };
 
-// 内存中的临时封禁缓存（使用Cloudflare Cache API）
-const IP_BAN_CACHE = new Map(); // 注意：Worker重启后会清空
+// 内存中的临时封禁缓存和访问记录
+const IP_BAN_CACHE = new Map(); // IP封禁缓存：key=IP, value=解封时间戳
+const IP_ACCESS_LOG = new Map(); // 访问记录：key=IP, value=访问时间戳数组
+
+// 清理过期的访问记录（保留最近2分钟）
+function cleanupAccessLog() {
+  const now = Date.now();
+  const twoMinutesAgo = now - 120000;
+
+  for (const [ip, timestamps] of IP_ACCESS_LOG.entries()) {
+    const validTimestamps = timestamps.filter(t => t > twoMinutesAgo);
+    if (validTimestamps.length === 0) {
+      IP_ACCESS_LOG.delete(ip);
+    } else {
+      IP_ACCESS_LOG.set(ip, validTimestamps);
+    }
+  }
+}
 
 // 反爬虫检查
 async function checkCrawler(ua, ip, env) {
@@ -1898,8 +1916,26 @@ async function checkCrawler(ua, ip, env) {
     IP_BAN_CACHE.delete(ip);
   }
 
-  // 简化的频率检查：使用内存计数
-  // 注意：这种方式在Worker重启后会重置，但足够防止短期内的滥用
+  // 频率检查：统计最近1分钟的访问次数
+  const oneMinuteAgo = now - 60000;
+  const accessLog = IP_ACCESS_LOG.get(ip) || [];
+  const recentAccess = accessLog.filter(t => t > oneMinuteAgo);
+
+  if (recentAccess.length >= MAX_REQUESTS_PER_MINUTE) {
+    // 超过限制，封禁24小时
+    IP_BAN_CACHE.set(ip, now + BAN_DURATION);
+    return { allowed: false, reason: 'Rate limit exceeded' };
+  }
+
+  // 记录本次访问
+  recentAccess.push(now);
+  IP_ACCESS_LOG.set(ip, recentAccess);
+
+  // 定期清理过期记录（每100次请求清理一次）
+  if (Math.random() < 0.01) {
+    cleanupAccessLog();
+  }
+
   return { allowed: true };
 }
 
@@ -2112,9 +2148,9 @@ async function handleStats(env) {
     'SELECT SUM(count) as total FROM visitors'
   ).first();
 
-  // IP归属地排名（按最后访问时间排序）
+  // IP归属地排名（按最后访问时间排序，包含访问次数）
   const topLocations = await env.DB.prepare(`
-    SELECT ip, country, city
+    SELECT ip, country, city, count
     FROM visitors
     ORDER BY last_visit DESC
     LIMIT 50
