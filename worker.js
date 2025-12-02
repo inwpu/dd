@@ -997,7 +997,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   </script>
 
   <script>
-    const API_BASE = (window.location && window.location.origin) || 'https://dd.snnuisdc.workers.dev';
+    const API_BASE = 'https://dd.snnuisdc.workers.dev'; // Worker URL，部署后填写
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
 
     let currentTripId = null; // 保存用户发布的行程ID
@@ -1186,7 +1186,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     // 手机号验证（宽松规则：仅验证11位数字）
     function validatePhone(phone) {
-      const phonePattern = /^1\\d{10}$/; // 1开头的11位数字
+      const phonePattern = /^1\d{10}\$/; // 1开头的11位数字
       return phonePattern.test(phone);
     }
 
@@ -1758,7 +1758,7 @@ const STATS_HTML = `<!DOCTYPE html>
   </div>
 
   <script>
-    const API_BASE = (window.location && window.location.origin) || 'https://dd.snnuisdc.workers.dev';
+    const API_BASE = 'https://dd.snnuisdc.workers.dev'; // Worker URL
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
 
     // 网站运行时间计算
@@ -1926,6 +1926,14 @@ export default {
         return handleImage('wechat');
       } else if (url.pathname === '/images/alipay.jpg') {
         return handleImage('alipay');
+      } else if (url.pathname.startsWith('/api/discussions')) {
+        // 代理 Giscus API 请求
+        const giscusUrl = `https://giscus.app${url.pathname}${url.search}`;
+        return fetch(giscusUrl, {
+          method: request.method,
+          headers: request.headers,
+          body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined
+        });
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
