@@ -1816,7 +1816,7 @@ const INDEX_HTML = `<!DOCTYPE html>
         container.innerHTML = \`
           <div class="tip">
             暂无匹配的拼车信息，您的行程已发布，其他用户可以找到您！
-            \${yourTrip ? \`<p style="margin-top: 10px;">您的行程：\${yourTrip.location} - \${yourTrip.time}</p>\` : ''}
+            \${yourTrip ? \`<p style="margin-top: 10px;">您的行程：\${yourTrip.departure} → \${yourTrip.destination} - \${yourTrip.time}</p>\` : ''}
           </div>
         \`;
         return;
@@ -1839,15 +1839,70 @@ const INDEX_HTML = `<!DOCTYPE html>
               <div>目的地：\${match.destination_location_name}</div>
               <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
             </div>
-            <div class="match-contact">
-              联系方式：\${match.contact}
-            </div>
+            \${match.is_matched ? \`
+              <div class="match-contact" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+                <strong>✓ 已匹配成功</strong>
+              </div>
+            \` : \`
+              <div class="match-contact">
+                联系方式：\${match.contact}
+              </div>
+              <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+                确认匹配
+              </button>
+            \`}
           </div>
         \`).join('')}
         <div class="tip">
-          建议优先电话联系，并开通"可通过手机号查找微信"功能方便添加微信。
+          建议优先电话联系，并开通"可通过手机号查找微信"功能方便添加微信。联系成功后请点击"确认匹配"按钮。
         </div>
       \`;
+
+      // 为确认匹配按钮绑定事件
+      container.querySelectorAll('.confirm-match-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const matchedTripId = parseInt(e.target.dataset.tripId);
+          if (!currentTripId) {
+            showMessage('无法确认匹配，请重新发布行程', 'error');
+            return;
+          }
+
+          try {
+            const response = await fetch(\`\${API_BASE}/api/confirm-match\`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                my_trip_id: currentTripId,
+                matched_trip_id: matchedTripId
+              })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              showMessage(result.error || '确认匹配失败', 'error');
+              return;
+            }
+
+            showMessage('匹配确认成功！', 'success');
+
+            // 重新获取匹配结果
+            const matchResponse = await fetch(\`\${API_BASE}/api/match\`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ trip_id: currentTripId })
+            });
+
+            const matchResult = await matchResponse.json();
+            if (matchResponse.ok) {
+              displayMatches(matchResult.matches || [], matchResult.your_trip);
+            }
+          } catch (error) {
+            console.error('确认匹配失败:', error);
+            showMessage('网络错误，请稍后重试', 'error');
+          }
+        });
+      });
     }
 
     function showMessage(message, type) {
@@ -1902,14 +1957,23 @@ const INDEX_HTML = `<!DOCTYPE html>
     function displayTimeQueryResult(data) {
       const container = document.getElementById('timeQueryResult');
 
-      if (data.total === 0) {
+      if (!data || data.total === 0) {
         container.innerHTML = '<div class="tip">该时段暂无行程信息</div>';
         return;
       }
 
-      const schoolList = Object.entries(data.school_distribution)
+      const schoolList = data.school_distribution ? Object.entries(data.school_distribution)
         .map(([school, count]) => \`<li>\${school}: \${count} 人</li>\`)
-        .join('');
+        .join('') : '';
+
+      const tripsList = (data.trips && data.trips.length > 0) ? data.trips.map(trip => \`
+        <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
+          <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
+          <div>出发地：\${trip.departure}</div>
+          <div>目的地：\${trip.destination}</div>
+          <div>出发时间：\${trip.departure_time}</div>
+        </div>
+      \`).join('') : '<div class="tip">暂无行程数据</div>';
 
       container.innerHTML = \`
         <div class="query-result">
@@ -1931,14 +1995,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
           <div style="margin-top: 20px;">
             <h4 style="color: #8b4513; margin-bottom: 10px;">行程列表（不含联系方式）</h4>
-            \${data.trips.map(trip => \`
-              <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
-                <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
-                <div>出发地：\${trip.departure}</div>
-                <div>目的地：\${trip.destination}</div>
-                <div>出发时间：\${trip.departure_time}</div>
-              </div>
-            \`).join('')}
+            \${tripsList}
           </div>
 
           <div class="tip" style="margin-top: 15px;">
@@ -2011,21 +2068,21 @@ const INDEX_HTML = `<!DOCTYPE html>
     function displayRouteQueryResult(data) {
       const container = document.getElementById('routeQueryResult');
 
-      if (data.total === 0) {
+      if (!data || data.total === 0) {
         container.innerHTML = '<div class="tip">该路线暂无行程信息</div>';
         return;
       }
 
-      const timeSlots = Object.entries(data.time_distribution)
+      const timeSlots = data.time_distribution ? Object.entries(data.time_distribution)
         .filter(([_, count]) => count > 0)
         .map(([time, count]) => \`
           <div class="stat-box">
             <div class="stat-box-value">\${count}</div>
             <div class="stat-box-label">\${time}</div>
           </div>
-        \`).join('');
+        \`).join('') : '';
 
-      const tripList = data.trips ? data.trips.map(trip => {
+      const tripList = (data.trips && data.trips.length > 0) ? data.trips.map(trip => {
         let distanceInfo = '';
         if (trip.departure_distance || trip.destination_distance) {
           const parts = [];
@@ -2045,15 +2102,19 @@ const INDEX_HTML = `<!DOCTYPE html>
         \`;
       }).join('') : '';
 
+      const routeInfo = data.route ? \`
+        <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c9a66b;">
+          <div><strong>路线：</strong>\${data.route.start} → \${data.route.end}</div>
+          <div style="margin-top: 8px;"><strong>日期：</strong>\${data.date || '不限'}</div>
+          <div style="margin-top: 8px; color: #8b4513; font-size: 1.1em;">\${data.summary || ''}</div>
+        </div>
+      \` : '';
+
       container.innerHTML = \`
         <div class="query-result">
           <h3 style="color: #8b4513; margin-bottom: 15px;">路线统计</h3>
 
-          <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c9a66b;">
-            <div><strong>路线：</strong>\${data.route.start} → \${data.route.end}</div>
-            <div style="margin-top: 8px;"><strong>日期：</strong>\${data.date}</div>
-            <div style="margin-top: 8px; color: #8b4513; font-size: 1.1em;">\${data.summary}</div>
-          </div>
+          \${routeInfo}
 
           <div class="stat-grid">
             \${timeSlots}
@@ -2522,6 +2583,8 @@ export default {
         return handleSearchByRoute(request, env, ip);
       } else if (url.pathname === '/api/stats') {
         return handleStats(env);
+      } else if (url.pathname === '/api/confirm-match') {
+        return handleConfirmMatch(request, env, ip);
       } else if (url.pathname === '/api/cleanup') {
         return handleCleanup(env);
       } else if (url.pathname === '/images/wechhat.jpg') {
@@ -2799,16 +2862,22 @@ async function handleMatch(request, env, ip) {
     ORDER BY departure_timestamp
   `).bind(minTime, maxTime, trip_id).all();
 
-  // 两点一线匹配：出发地≤1km 且 目的地≤1km（最多2人）
+  // 两点一线匹配：出发地≤1km 且 目的地≤1km（显示所有匹配）
   const matches = [];
   for (const trip of trips.results) {
-    if (matches.length >= 2) break; // 最多返回2个匹配
-
     const departureDistance = haversineDistance(userDepartureLat, userDepartureLon, trip.departure_lat, trip.departure_lon);
     const destinationDistance = haversineDistance(userDestinationLat, userDestinationLon, trip.destination_lat, trip.destination_lon);
 
     // 必须同时满足：出发地≤1km 且 目的地≤1km
     if (departureDistance <= 1.0 && destinationDistance <= 1.0) {
+      // 检查是否已匹配
+      const [trip1, trip2] = trip_id < trip.id ? [trip_id, trip.id] : [trip.id, trip_id];
+      const matchRecord = await env.DB.prepare(
+        'SELECT * FROM trip_matches WHERE trip_id_1 = ? AND trip_id_2 = ?'
+      ).bind(trip1, trip2).first();
+
+      const isMatched = !!matchRecord;
+
       matches.push({
         id: trip.id,
         name: trip.name,
@@ -2819,9 +2888,10 @@ async function handleMatch(request, env, ip) {
         destination_location_name: trip.destination_location_name,
         departure_date: trip.departure_date,
         departure_time: trip.departure_time,
-        contact: trip.contact, // 只有匹配接口才返回联系方式
+        contact: isMatched ? null : trip.contact, // 已匹配则不显示联系方式
         departure_distance: departureDistance.toFixed(2),
-        destination_distance: destinationDistance.toFixed(2)
+        destination_distance: destinationDistance.toFixed(2),
+        is_matched: isMatched
       });
     }
   }
@@ -2841,6 +2911,49 @@ async function handleMatch(request, env, ip) {
 }
 
 // 访客统计
+// 确认匹配
+async function handleConfirmMatch(request, env, ip) {
+  const body = await request.json();
+  const { my_trip_id, matched_trip_id } = body;
+
+  if (!my_trip_id || !matched_trip_id) {
+    return jsonResponse({ error: '缺少必要参数' }, 400);
+  }
+
+  // 验证用户拥有 my_trip_id
+  const myTrip = await env.DB.prepare('SELECT * FROM trips WHERE id = ? AND ip = ?')
+    .bind(my_trip_id, ip).first();
+
+  if (!myTrip) {
+    return jsonResponse({ error: '无效的行程或无权限操作' }, 403);
+  }
+
+  // 验证 matched_trip_id 存在
+  const matchedTrip = await env.DB.prepare('SELECT * FROM trips WHERE id = ?')
+    .bind(matched_trip_id).first();
+
+  if (!matchedTrip) {
+    return jsonResponse({ error: '匹配的行程不存在' }, 404);
+  }
+
+  // 确保 trip_id_1 < trip_id_2 以满足 UNIQUE 约束
+  const [trip1, trip2] = my_trip_id < matched_trip_id ?
+    [my_trip_id, matched_trip_id] : [matched_trip_id, my_trip_id];
+
+  try {
+    await env.DB.prepare(`
+      INSERT INTO trip_matches (trip_id_1, trip_id_2, confirmed_by, confirmed_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(trip_id_1, trip_id_2) DO NOTHING
+    `).bind(trip1, trip2, my_trip_id, Date.now()).run();
+
+    return jsonResponse({ success: true });
+  } catch (error) {
+    console.error('Confirm match error:', error);
+    return jsonResponse({ error: '确认匹配失败' }, 500);
+  }
+}
+
 async function handleStats(env) {
   // UV（独立访客数）
   const totalVisitors = await env.DB.prepare(

@@ -75,3 +75,16 @@ CREATE TABLE IF NOT EXISTS query_limits (
 );
 
 CREATE INDEX idx_query_limits_ip_minute ON query_limits(ip, minute);
+
+-- 匹配确认表
+CREATE TABLE IF NOT EXISTS trip_matches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trip_id_1 INTEGER NOT NULL,
+  trip_id_2 INTEGER NOT NULL,
+  confirmed_by INTEGER NOT NULL,
+  confirmed_at INTEGER NOT NULL,
+  UNIQUE(trip_id_1, trip_id_2)
+);
+
+CREATE INDEX idx_trip_matches_trip1 ON trip_matches(trip_id_1);
+CREATE INDEX idx_trip_matches_trip2 ON trip_matches(trip_id_2);
