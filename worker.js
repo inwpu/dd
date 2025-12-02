@@ -595,6 +595,45 @@ const INDEX_HTML = `<!DOCTYPE html>
       width: 100% !important;
     }
 
+    /* 自定义日期时间选择器样式 */
+    .datetime-picker {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .datetime-picker select {
+      padding: 10px 12px;
+      border: 2px solid #c9a66b;
+      border-radius: 6px;
+      background: white;
+      color: #5d4037;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 80px;
+    }
+
+    .datetime-picker select:hover {
+      border-color: #8b4513;
+      box-shadow: 0 0 8px rgba(139, 69, 19, 0.2);
+    }
+
+    .datetime-picker select:focus {
+      outline: none;
+      border-color: #8b4513;
+      box-shadow: 0 0 12px rgba(139, 69, 19, 0.3);
+    }
+
+    .datetime-picker .date-separator,
+    .datetime-picker .time-separator {
+      display: flex;
+      align-items: center;
+      color: #8b4513;
+      font-weight: bold;
+      padding: 0 4px;
+    }
+
     @media (max-width: 768px) {
       body {
         padding: 10px;
@@ -838,10 +877,32 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="form-group">
+        <label>出发日期 *</label>
+        <div class="datetime-picker">
+          <select id="departureYear" required>
+            <option value="">年</option>
+          </select>
+          <span class="date-separator">-</span>
+          <select id="departureMonth" required>
+            <option value="">月</option>
+          </select>
+          <span class="date-separator">-</span>
+          <select id="departureDay" required>
+            <option value="">日</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label>出发时间 *</label>
-        <div class="datetime-row">
-          <input type="date" id="departureDate" required>
-          <input type="time" id="departureTime" required>
+        <div class="datetime-picker">
+          <select id="departureHour" required>
+            <option value="">时</option>
+          </select>
+          <span class="time-separator">:</span>
+          <select id="departureMinute" required>
+            <option value="">分</option>
+          </select>
         </div>
       </div>
 
@@ -899,15 +960,45 @@ const INDEX_HTML = `<!DOCTYPE html>
     <div id="queryTimeTab" class="tab-content">
       <form id="timeQueryForm">
         <div class="form-group">
-          <label for="queryDate">查询日期 *</label>
-          <input type="date" id="queryDate" required>
+          <label>查询日期 *</label>
+          <div class="datetime-picker">
+            <select id="queryYear" required>
+              <option value="">年</option>
+            </select>
+            <span class="date-separator">-</span>
+            <select id="queryMonth" required>
+              <option value="">月</option>
+            </select>
+            <span class="date-separator">-</span>
+            <select id="queryDay" required>
+              <option value="">日</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
-          <label>时间范围 *</label>
-          <div class="datetime-row">
-            <input type="time" id="queryStartTime" required placeholder="开始时间">
-            <input type="time" id="queryEndTime" required placeholder="结束时间">
+          <label>开始时间 *</label>
+          <div class="datetime-picker">
+            <select id="queryStartHour" required>
+              <option value="">时</option>
+            </select>
+            <span class="time-separator">:</span>
+            <select id="queryStartMinute" required>
+              <option value="">分</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>结束时间 *</label>
+          <div class="datetime-picker">
+            <select id="queryEndHour" required>
+              <option value="">时</option>
+            </select>
+            <span class="time-separator">:</span>
+            <select id="queryEndMinute" required>
+              <option value="">分</option>
+            </select>
           </div>
         </div>
 
@@ -936,8 +1027,20 @@ const INDEX_HTML = `<!DOCTYPE html>
         </div>
 
         <div class="form-group">
-          <label for="routeDate">指定日期（可选）</label>
-          <input type="date" id="routeDate">
+          <label>指定日期（可选）</label>
+          <div class="datetime-picker">
+            <select id="routeYear">
+              <option value="">年</option>
+            </select>
+            <span class="date-separator">-</span>
+            <select id="routeMonth">
+              <option value="">月</option>
+            </select>
+            <span class="date-separator">-</span>
+            <select id="routeDay">
+              <option value="">日</option>
+            </select>
+          </div>
         </div>
 
         <div class="tip">
@@ -1396,9 +1499,91 @@ const INDEX_HTML = `<!DOCTYPE html>
       }
     });
 
-    // 设置最小日期为今天
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('departureDate').min = today;
+    // 初始化日期时间选择器
+    function initDateTimePicker(yearId, monthId, dayId, hourId, minuteId, daysAhead = 7) {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const currentDay = now.getDate();
+
+      // 初始化年份（今年和明年）
+      if (yearId) {
+        const yearSelect = document.getElementById(yearId);
+        for (let year = currentYear; year <= currentYear + 1; year++) {
+          const option = document.createElement('option');
+          option.value = year;
+          option.textContent = year + '年';
+          yearSelect.appendChild(option);
+        }
+        yearSelect.value = currentYear;
+      }
+
+      // 初始化月份
+      if (monthId) {
+        const monthSelect = document.getElementById(monthId);
+        for (let month = 1; month <= 12; month++) {
+          const option = document.createElement('option');
+          option.value = month < 10 ? '0' + month : month;
+          option.textContent = month + '月';
+          monthSelect.appendChild(option);
+        }
+        monthSelect.value = currentMonth < 10 ? '0' + currentMonth : currentMonth;
+      }
+
+      // 初始化日期
+      if (dayId) {
+        const updateDays = () => {
+          const yearSelect = document.getElementById(yearId);
+          const monthSelect = document.getElementById(monthId);
+          const daySelect = document.getElementById(dayId);
+
+          const year = parseInt(yearSelect?.value || currentYear);
+          const month = parseInt(monthSelect?.value || currentMonth);
+          const daysInMonth = new Date(year, month, 0).getDate();
+
+          daySelect.innerHTML = '<option value="">日</option>';
+          for (let day = 1; day <= daysInMonth; day++) {
+            const option = document.createElement('option');
+            option.value = day < 10 ? '0' + day : day;
+            option.textContent = day + '日';
+            daySelect.appendChild(option);
+          }
+          daySelect.value = currentDay < 10 ? '0' + currentDay : currentDay;
+        };
+
+        if (yearId) document.getElementById(yearId).addEventListener('change', updateDays);
+        if (monthId) document.getElementById(monthId).addEventListener('change', updateDays);
+        updateDays();
+      }
+
+      // 初始化小时
+      if (hourId) {
+        const hourSelect = document.getElementById(hourId);
+        for (let hour = 0; hour < 24; hour++) {
+          const option = document.createElement('option');
+          option.value = hour < 10 ? '0' + hour : hour;
+          option.textContent = hour < 10 ? '0' + hour : hour;
+          hourSelect.appendChild(option);
+        }
+      }
+
+      // 初始化分钟
+      if (minuteId) {
+        const minuteSelect = document.getElementById(minuteId);
+        for (let minute = 0; minute < 60; minute += 5) {
+          const option = document.createElement('option');
+          option.value = minute < 10 ? '0' + minute : minute;
+          option.textContent = minute < 10 ? '0' + minute : minute;
+          minuteSelect.appendChild(option);
+        }
+      }
+    }
+
+    // 初始化所有日期时间选择器
+    initDateTimePicker('departureYear', 'departureMonth', 'departureDay', 'departureHour', 'departureMinute', 7);
+    initDateTimePicker('queryYear', 'queryMonth', 'queryDay', 'queryStartHour', 'queryStartMinute', 7);
+    initDateTimePicker(null, null, null, 'queryEndHour', 'queryEndMinute', 7);
+    initDateTimePicker('routeYear', 'routeMonth', 'routeDay', null, null, 7);
 
     // 手机号验证（宽松规则：仅验证11位数字）
     function validatePhone(phone) {
@@ -1427,6 +1612,21 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // 组装日期和时间
+      const year = document.getElementById('departureYear').value;
+      const month = document.getElementById('departureMonth').value;
+      const day = document.getElementById('departureDay').value;
+      const hour = document.getElementById('departureHour').value;
+      const minute = document.getElementById('departureMinute').value;
+
+      if (!year || !month || !day || !hour || !minute) {
+        showMessage('请完整填写出发日期和时间', 'error');
+        return;
+      }
+
+      const departure_date = \`\${year}-\${month}-\${day}\`;
+      const departure_time = \`\${hour}:\${minute}\`;
+
       const formData = {
         name: document.getElementById('name').value.trim(),
         school: document.getElementById('school').value.trim(),
@@ -1438,8 +1638,8 @@ const INDEX_HTML = `<!DOCTYPE html>
         destination_lat: selectedDestination.lat,
         destination_lon: selectedDestination.lon,
         destination_location_name: selectedDestination.name,
-        departure_date: document.getElementById('departureDate').value,
-        departure_time: document.getElementById('departureTime').value,
+        departure_date: departure_date,
+        departure_time: departure_time,
         contact: document.getElementById('contact').value.trim(),
         time_range: parseInt(document.getElementById('timeRange').value)
       };
@@ -1550,9 +1750,23 @@ const INDEX_HTML = `<!DOCTYPE html>
     document.getElementById('timeQueryForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const date = document.getElementById('queryDate').value;
-      const startTime = document.getElementById('queryStartTime').value;
-      const endTime = document.getElementById('queryEndTime').value;
+      // 组装日期和时间
+      const year = document.getElementById('queryYear').value;
+      const month = document.getElementById('queryMonth').value;
+      const day = document.getElementById('queryDay').value;
+      const startHour = document.getElementById('queryStartHour').value;
+      const startMinute = document.getElementById('queryStartMinute').value;
+      const endHour = document.getElementById('queryEndHour').value;
+      const endMinute = document.getElementById('queryEndMinute').value;
+
+      if (!year || !month || !day || !startHour || !startMinute || !endHour || !endMinute) {
+        showMessage('请完整填写查询日期和时间范围', 'error');
+        return;
+      }
+
+      const date = \`\${year}-\${month}-\${day}\`;
+      const startTime = \`\${startHour}:\${startMinute}\`;
+      const endTime = \`\${endHour}:\${endMinute}\`;
 
       try {
         const response = await fetch(\`\${API_BASE}/api/search-by-time?date=\${date}&start_time=\${startTime}&end_time=\${endTime}\`);
@@ -1625,7 +1839,12 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       const startLocationText = document.getElementById('routeStart').value.trim();
       const endLocationText = document.getElementById('routeEnd').value.trim();
-      const date = document.getElementById('routeDate').value;
+
+      // 组装日期（可选）
+      const year = document.getElementById('routeYear').value;
+      const month = document.getElementById('routeMonth').value;
+      const day = document.getElementById('routeDay').value;
+      const date = (year && month && day) ? \`\${year}-\${month}-\${day}\` : null;
 
       // 至少需要填写一个地点
       if (!startLocationText && !endLocationText) {
@@ -1633,7 +1852,7 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
-      const requestData = { date: date || null };
+      const requestData = { date: date };
 
       // 添加出发地坐标（如果选择了）
       if (selectedRouteStart) {
@@ -1738,10 +1957,6 @@ const INDEX_HTML = `<!DOCTYPE html>
         </div>
       \`;
     }
-
-    // 设置查询表单的最小日期为今天
-    document.getElementById('queryDate').min = new Date().toISOString().split('T')[0];
-    document.getElementById('routeDate').min = new Date().toISOString().split('T')[0];
 
     // 加载访客统计数据
     async function loadVisitorStats() {
