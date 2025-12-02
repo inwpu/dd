@@ -1303,10 +1303,18 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
 
           if (data.tips && data.tips.length > 0) {
-            departureSuggestions.innerHTML = data.tips.map(tip =>
-              \`<div class="suggestion-item" onclick='selectDeparture(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            departureSuggestions.innerHTML = data.tips.map((tip, index) =>
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             departureSuggestions.style.display = 'block';
+
+            // 绑定点击事件
+            window.currentDepartureTips = data.tips;
+            document.querySelectorAll('#departureSuggestions .suggestion-item').forEach((item, index) => {
+              if (item.dataset.tipIndex !== undefined) {
+                item.onclick = () => selectDeparture(window.currentDepartureTips[index]);
+              }
+            });
           } else {
             departureSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             departureSuggestions.style.display = 'block';
@@ -1373,10 +1381,18 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
 
           if (data.tips && data.tips.length > 0) {
-            destinationSuggestions.innerHTML = data.tips.map(tip =>
-              \`<div class="suggestion-item" onclick='selectDestination(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            destinationSuggestions.innerHTML = data.tips.map((tip, index) =>
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             destinationSuggestions.style.display = 'block';
+
+            // 绑定点击事件
+            window.currentDestinationTips = data.tips;
+            document.querySelectorAll('#destinationSuggestions .suggestion-item').forEach((item, index) => {
+              if (item.dataset.tipIndex !== undefined) {
+                item.onclick = () => selectDestination(window.currentDestinationTips[index]);
+              }
+            });
           } else {
             destinationSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             destinationSuggestions.style.display = 'block';
@@ -1443,10 +1459,18 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('路线查询-出发地搜索结果:', data);
 
           if (data.tips && data.tips.length > 0) {
-            routeStartSuggestions.innerHTML = data.tips.map(tip =>
-              \`<div class="suggestion-item" onclick='selectRouteStart(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            routeStartSuggestions.innerHTML = data.tips.map((tip, index) =>
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeStartSuggestions.style.display = 'block';
+
+            // 绑定点击事件
+            window.currentRouteStartTips = data.tips;
+            document.querySelectorAll('#routeStartSuggestions .suggestion-item').forEach((item, index) => {
+              if (item.dataset.tipIndex !== undefined) {
+                item.onclick = () => selectRouteStart(window.currentRouteStartTips[index]);
+              }
+            });
           } else {
             routeStartSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             routeStartSuggestions.style.display = 'block';
@@ -1507,10 +1531,18 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('路线查询-目的地搜索结果:', data);
 
           if (data.tips && data.tips.length > 0) {
-            routeEndSuggestions.innerHTML = data.tips.map(tip =>
-              \`<div class="suggestion-item" onclick='selectRouteEnd(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            routeEndSuggestions.innerHTML = data.tips.map((tip, index) =>
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeEndSuggestions.style.display = 'block';
+
+            // 绑定点击事件
+            window.currentRouteEndTips = data.tips;
+            document.querySelectorAll('#routeEndSuggestions .suggestion-item').forEach((item, index) => {
+              if (item.dataset.tipIndex !== undefined) {
+                item.onclick = () => selectRouteEnd(window.currentRouteEndTips[index]);
+              }
+            });
           } else {
             routeEndSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             routeEndSuggestions.style.display = 'block';
