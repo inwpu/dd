@@ -797,8 +797,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       <p style="margin-top: 8px;"><strong>隐私提示：</strong>只有发布行程的用户才能查看其他人的联系方式，仅查询不会显示联系方式。</p>
       <p style="margin-top: 8px;"><strong>匹配规则：</strong></p>
       <ul style="margin-left: 20px; margin-top: 5px;">
-        <li>出发时间在您设定的时间范围内（±30分钟或±1小时）</li>
-        <li>目的地距离您的目的地≤1公里</li>
+        <li>出发地点距离≤1公里</li>
+        <li>目的地距离≤1公里</li>
+        <li>出发时间相差≤1小时</li>
         <li>最多显示2个匹配结果</li>
       </ul>
     </div>
@@ -852,10 +853,18 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="form-group">
-        <label for="location">目的地 *</label>
+        <label for="departure">出发地点 *</label>
         <div style="position: relative;">
-          <input type="text" id="location" required placeholder="请输入目的地（支持地址搜索）" autocomplete="off">
-          <div id="locationSuggestions" class="suggestions" style="display: none;"></div>
+          <input type="text" id="departure" required placeholder="请输入出发地点（支持地址搜索）" autocomplete="off">
+          <div id="departureSuggestions" class="suggestions" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="destination">目的地 *</label>
+        <div style="position: relative;">
+          <input type="text" id="destination" required placeholder="请输入目的地（支持地址搜索）" autocomplete="off">
+          <div id="destinationSuggestions" class="suggestions" style="display: none;"></div>
         </div>
       </div>
 
@@ -1080,8 +1089,10 @@ const INDEX_HTML = `<!DOCTYPE html>
       "西安交通职业大学"
     ];
 
-    let selectedLocation = null;
-    let debounceTimer = null;
+    let selectedDeparture = null;
+    let selectedDestination = null;
+    let debounceTimerDeparture = null;
+    let debounceTimerDestination = null;
 
     // 学校输入提示
     const schoolInput = document.getElementById('school');
@@ -1110,31 +1121,31 @@ const INDEX_HTML = `<!DOCTYPE html>
       schoolSuggestions.style.display = 'none';
     }
 
-    // 地点搜索
-    const locationInput = document.getElementById('location');
-    const locationSuggestions = document.getElementById('locationSuggestions');
+    // 出发地点搜索
+    const departureInput = document.getElementById('departure');
+    const departureSuggestions = document.getElementById('departureSuggestions');
 
-    locationInput.addEventListener('input', (e) => {
-      clearTimeout(debounceTimer);
+    departureInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimerDeparture);
       const value = e.target.value.trim();
 
       if (!value) {
-        locationSuggestions.style.display = 'none';
+        departureSuggestions.style.display = 'none';
         return;
       }
 
-      debounceTimer = setTimeout(async () => {
+      debounceTimerDeparture = setTimeout(async () => {
         try {
           const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
           const data = await response.json();
 
           if (data.tips && data.tips.length > 0) {
-            locationSuggestions.innerHTML = data.tips.map(tip =>
-              \`<div class="suggestion-item" onclick='selectLocation(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            departureSuggestions.innerHTML = data.tips.map(tip =>
+              \`<div class="suggestion-item" onclick='selectDeparture(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
-            locationSuggestions.style.display = 'block';
+            departureSuggestions.style.display = 'block';
           } else {
-            locationSuggestions.style.display = 'none';
+            departureSuggestions.style.display = 'none';
           }
         } catch (error) {
           console.error('搜索失败:', error);
@@ -1142,15 +1153,14 @@ const INDEX_HTML = `<!DOCTYPE html>
       }, 400);
     });
 
-    async function selectLocation(tip) {
-      locationInput.value = tip.name;
-      locationSuggestions.style.display = 'none';
+    async function selectDeparture(tip) {
+      departureInput.value = tip.name;
+      departureSuggestions.style.display = 'none';
 
       if (tip.location) {
         const [lon, lat] = tip.location.split(',');
-        selectedLocation = { lat: parseFloat(lat), lon: parseFloat(lon), name: tip.name };
+        selectedDeparture = { lat: parseFloat(lat), lon: parseFloat(lon), name: tip.name };
       } else {
-        // 需要进一步解析
         try {
           const response = await fetch(\`\${API_BASE}/api/resolve-poi\`, {
             method: 'POST',
@@ -1162,7 +1172,66 @@ const INDEX_HTML = `<!DOCTYPE html>
           if (data.pois && data.pois.length > 0) {
             const poi = data.pois[0];
             const [lon, lat] = poi.location.split(',');
-            selectedLocation = { lat: parseFloat(lat), lon: parseFloat(lon), name: poi.name };
+            selectedDeparture = { lat: parseFloat(lat), lon: parseFloat(lon), name: poi.name };
+          }
+        } catch (error) {
+          console.error('解析位置失败:', error);
+        }
+      }
+    }
+
+    // 目的地搜索
+    const destinationInput = document.getElementById('destination');
+    const destinationSuggestions = document.getElementById('destinationSuggestions');
+
+    destinationInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimerDestination);
+      const value = e.target.value.trim();
+
+      if (!value) {
+        destinationSuggestions.style.display = 'none';
+        return;
+      }
+
+      debounceTimerDestination = setTimeout(async () => {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
+          const data = await response.json();
+
+          if (data.tips && data.tips.length > 0) {
+            destinationSuggestions.innerHTML = data.tips.map(tip =>
+              \`<div class="suggestion-item" onclick='selectDestination(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            ).join('');
+            destinationSuggestions.style.display = 'block';
+          } else {
+            destinationSuggestions.style.display = 'none';
+          }
+        } catch (error) {
+          console.error('搜索失败:', error);
+        }
+      }, 400);
+    });
+
+    async function selectDestination(tip) {
+      destinationInput.value = tip.name;
+      destinationSuggestions.style.display = 'none';
+
+      if (tip.location) {
+        const [lon, lat] = tip.location.split(',');
+        selectedDestination = { lat: parseFloat(lat), lon: parseFloat(lon), name: tip.name };
+      } else {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/resolve-poi\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: tip.name })
+          });
+          const data = await response.json();
+
+          if (data.pois && data.pois.length > 0) {
+            const poi = data.pois[0];
+            const [lon, lat] = poi.location.split(',');
+            selectedDestination = { lat: parseFloat(lat), lon: parseFloat(lon), name: poi.name };
           }
         } catch (error) {
           console.error('解析位置失败:', error);
@@ -1175,8 +1244,11 @@ const INDEX_HTML = `<!DOCTYPE html>
       if (!e.target.closest('#school') && !e.target.closest('#schoolSuggestions')) {
         schoolSuggestions.style.display = 'none';
       }
-      if (!e.target.closest('#location') && !e.target.closest('#locationSuggestions')) {
-        locationSuggestions.style.display = 'none';
+      if (!e.target.closest('#departure') && !e.target.closest('#departureSuggestions')) {
+        departureSuggestions.style.display = 'none';
+      }
+      if (!e.target.closest('#destination') && !e.target.closest('#destinationSuggestions')) {
+        destinationSuggestions.style.display = 'none';
       }
     });
 
@@ -1194,7 +1266,12 @@ const INDEX_HTML = `<!DOCTYPE html>
     document.getElementById('tripForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      if (!selectedLocation) {
+      if (!selectedDeparture) {
+        showMessage('请选择有效的出发地点', 'error');
+        return;
+      }
+
+      if (!selectedDestination) {
         showMessage('请选择有效的目的地', 'error');
         return;
       }
@@ -1211,9 +1288,12 @@ const INDEX_HTML = `<!DOCTYPE html>
         school: document.getElementById('school').value.trim(),
         campus: document.getElementById('campus').value.trim(),
         college: document.getElementById('college').value.trim(),
-        lat: selectedLocation.lat,
-        lon: selectedLocation.lon,
-        location_name: selectedLocation.name,
+        departure_lat: selectedDeparture.lat,
+        departure_lon: selectedDeparture.lon,
+        departure_location_name: selectedDeparture.name,
+        destination_lat: selectedDestination.lat,
+        destination_lon: selectedDestination.lon,
+        destination_location_name: selectedDestination.name,
         departure_date: document.getElementById('departureDate').value,
         departure_time: document.getElementById('departureTime').value,
         contact: document.getElementById('contact').value.trim(),
@@ -1244,15 +1324,11 @@ const INDEX_HTML = `<!DOCTYPE html>
         showMessage('行程发布成功！正在为您匹配拼车信息...', 'success');
 
         // 匹配行程（使用trip_id）
-        const departureDateTime = new Date(\`\${formData.departure_date}T\${formData.departure_time}:00\`);
         const matchResponse = await fetch(\`\${API_BASE}/api/match\`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            trip_id: currentTripId,
-            lat: formData.lat,
-            lon: formData.lon,
-            departure_timestamp: departureDateTime.getTime()
+            trip_id: currentTripId
           })
         });
 
@@ -1295,12 +1371,13 @@ const INDEX_HTML = `<!DOCTYPE html>
           <div class="match-card">
             <div class="match-header">
               <span class="match-name">\${match.name}</span>
-              <span class="match-distance">距离 \${match.distance} km</span>
+              <span class="match-distance">出发地 \${match.departure_distance}km · 目的地 \${match.destination_distance}km</span>
             </div>
             <div class="match-info">
               <div>学校：\${match.school} \${match.campus ? '· ' + match.campus : ''}</div>
               \${match.college ? \`<div>学院：\${match.college}</div>\` : ''}
-              <div>目的地：\${match.location_name}</div>
+              <div>出发地：\${match.departure_location_name}</div>
+              <div>目的地：\${match.destination_location_name}</div>
               <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
             </div>
             <div class="match-contact">
@@ -1384,7 +1461,8 @@ const INDEX_HTML = `<!DOCTYPE html>
             \${data.trips.map(trip => \`
               <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
                 <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
-                <div>目的地：\${trip.location}</div>
+                <div>出发地：\${trip.departure}</div>
+                <div>目的地：\${trip.destination}</div>
                 <div>出发时间：\${trip.departure_time}</div>
               </div>
             \`).join('')}
@@ -2074,10 +2152,10 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, school, campus, college, lat, lon, location_name, departure_date, departure_time, contact, time_range } = body;
+  const { name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range } = body;
 
   // 验证必填字段
-  if (!name || !school || !lat || !lon || !location_name || !departure_date || !departure_time || !contact || !time_range) {
+  if (!name || !school || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
   }
 
@@ -2108,11 +2186,11 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '仅支持未来7天内的行程，请勿录入7天后的行程' }, 400);
   }
 
-  // 插入数据库（包含IP和时间范围）
+  // 插入数据库（包含出发地和目的地）
   const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, lat, lon, location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(name, school, campus || '', college || '', lat, lon, location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, now).run();
+    INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(name, school, campus || '', college || '', departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, now).run();
 
   // 清理过期数据
   await cleanupExpiredTrips(env);
@@ -2123,7 +2201,7 @@ async function handleCreateTrip(request, env, ip) {
 // 匹配行程（仅限已发布行程的用户使用，返回联系方式）
 async function handleMatch(request, env, ip) {
   const body = await request.json();
-  const { trip_id, lat, lon, departure_timestamp } = body;
+  const { trip_id } = body;
 
   // 规则1：必须先发布自己的行程
   if (!trip_id) {
@@ -2164,15 +2242,16 @@ async function handleMatch(request, env, ip) {
   }
 
   // 使用用户自己的行程信息进行匹配
-  const userLat = userTrip.lat;
-  const userLon = userTrip.lon;
+  const userDepartureLat = userTrip.departure_lat;
+  const userDepartureLon = userTrip.departure_lon;
+  const userDestinationLat = userTrip.destination_lat;
+  const userDestinationLon = userTrip.destination_lon;
   const userTimestamp = userTrip.departure_timestamp;
-  const userTimeRange = userTrip.time_range || 60; // 默认60分钟
 
-  // 时间范围：根据用户选择的时间范围（±30分钟或±1小时）
-  const timeRangeMs = userTimeRange * 60 * 1000; // 转换为毫秒
-  const minTime = userTimestamp - timeRangeMs;
-  const maxTime = userTimestamp + timeRangeMs;
+  // 时间范围：固定为±1小时
+  const oneHourMs = 60 * 60 * 1000;
+  const minTime = userTimestamp - oneHourMs;
+  const maxTime = userTimestamp + oneHourMs;
 
   // 查询时间范围内的行程（排除自己的）
   const trips = await env.DB.prepare(`
@@ -2182,24 +2261,29 @@ async function handleMatch(request, env, ip) {
     ORDER BY departure_timestamp
   `).bind(minTime, maxTime, trip_id).all();
 
-  // 计算距离并过滤（规则3：只返回≤1km的匹配，最多2人）
+  // 两点一线匹配：出发地≤1km 且 目的地≤1km（最多2人）
   const matches = [];
   for (const trip of trips.results) {
     if (matches.length >= 2) break; // 最多返回2个匹配
 
-    const distance = haversineDistance(userLat, userLon, trip.lat, trip.lon);
-    if (distance <= 1.0) { // 1km内
+    const departureDistance = haversineDistance(userDepartureLat, userDepartureLon, trip.departure_lat, trip.departure_lon);
+    const destinationDistance = haversineDistance(userDestinationLat, userDestinationLon, trip.destination_lat, trip.destination_lon);
+
+    // 必须同时满足：出发地≤1km 且 目的地≤1km
+    if (departureDistance <= 1.0 && destinationDistance <= 1.0) {
       matches.push({
         id: trip.id,
         name: trip.name,
         school: trip.school,
         campus: trip.campus,
         college: trip.college,
-        location_name: trip.location_name,
+        departure_location_name: trip.departure_location_name,
+        destination_location_name: trip.destination_location_name,
         departure_date: trip.departure_date,
         departure_time: trip.departure_time,
         contact: trip.contact, // 只有匹配接口才返回联系方式
-        distance: distance.toFixed(2)
+        departure_distance: departureDistance.toFixed(2),
+        destination_distance: destinationDistance.toFixed(2)
       });
     }
   }
@@ -2211,7 +2295,8 @@ async function handleMatch(request, env, ip) {
     matches,
     your_trip: {
       id: userTrip.id,
-      location: userTrip.location_name,
+      departure: userTrip.departure_location_name,
+      destination: userTrip.destination_location_name,
       time: `${userTrip.departure_date} ${userTrip.departure_time}`
     }
   });
@@ -2278,7 +2363,7 @@ async function handleSearchByTime(request, env, ip) {
 
   // 查询该时间段内的行程
   const trips = await env.DB.prepare(`
-    SELECT id, school, campus, location_name, departure_date, departure_time, departure_timestamp
+    SELECT id, school, campus, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp
     FROM trips
     WHERE departure_timestamp BETWEEN ? AND ?
     ORDER BY departure_timestamp
@@ -2301,7 +2386,8 @@ async function handleSearchByTime(request, env, ip) {
     trips: trips.results.map(t => ({
       school: t.school,
       campus: t.campus,
-      location: t.location_name,
+      departure: t.departure_location_name,
+      destination: t.destination_location_name,
       departure_time: `${t.departure_date} ${t.departure_time}`
     }))
   });
@@ -2338,9 +2424,9 @@ async function handleSearchByRoute(request, env, ip) {
   await recordQueryAttempt(ip, env);
 
   let query = `
-    SELECT id, school, campus, location_name, departure_date, departure_time, departure_timestamp, lat, lon
+    SELECT id, school, campus, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon
     FROM trips
-    WHERE location_name LIKE ?
+    WHERE destination_location_name LIKE ?
   `;
   let params = [`%${end_location.trim()}%`];
 
