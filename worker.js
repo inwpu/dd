@@ -1124,7 +1124,7 @@ const INDEX_HTML = `<!DOCTYPE html>
     <div class="donate-section">
       <h2 class="donate-title">支持平台运营</h2>
       <div class="donate-desc">
-        <p>本平台为公益性质的免费服务，运营费用包括 Cloudflare 服务器费用和高德地图 API 调用费用。</p>
+        <p>本平台为公益性质的免费服务，运营费用包括服务器费用和高德地图 API 调用费用。</p>
         <p style="margin-top: 10px;">如果您觉得平台对您有帮助，欢迎通过以下方式支持我们：</p>
       </div>
       <div class="qr-container">
