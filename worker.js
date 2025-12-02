@@ -3090,7 +3090,6 @@ async function handleCreateTrip(request, env, ip) {
   }
 
   // 检查相同手机号短期重复（1小时内同一手机号最多2次）
-  const oneHourAgo = now - 60 * 60 * 1000;
   const phoneCount = await env.DB.prepare(
     'SELECT COUNT(*) as count FROM trips WHERE contact = ? AND created_at > ?'
   ).bind(contact, oneHourAgo).first();
