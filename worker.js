@@ -916,18 +916,28 @@ const INDEX_HTML = `<!DOCTYPE html>
     <div id="queryRouteTab" class="tab-content">
       <form id="routeQueryForm">
         <div class="form-group">
-          <label for="routeStart">出发地点（可选）</label>
-          <input type="text" id="routeStart" placeholder="例如：西工大长安校区">
+          <label for="routeStart">出发地点</label>
+          <div style="position: relative;">
+            <input type="text" id="routeStart" placeholder="例如：西工大长安校区" autocomplete="off">
+            <div id="routeStartSuggestions" class="suggestions" style="display: none;"></div>
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="routeEnd">目的地 *</label>
-          <input type="text" id="routeEnd" required placeholder="例如：航天城地铁站">
+          <label for="routeEnd">目的地</label>
+          <div style="position: relative;">
+            <input type="text" id="routeEnd" placeholder="例如：航天城地铁站" autocomplete="off">
+            <div id="routeEndSuggestions" class="suggestions" style="display: none;"></div>
+          </div>
         </div>
 
         <div class="form-group">
           <label for="routeDate">指定日期（可选）</label>
           <input type="date" id="routeDate">
+        </div>
+
+        <div class="tip">
+          提示：可以只填写出发地或目的地，也可以两者都填写进行精确匹配（两点距离各≤1km）
         </div>
 
         <button type="submit">查询该路线统计</button>
@@ -1239,6 +1249,130 @@ const INDEX_HTML = `<!DOCTYPE html>
       }
     }
 
+    // 路线查询的地点搜索
+    let selectedRouteStart = null;
+    let selectedRouteEnd = null;
+    let debounceTimerRouteStart = null;
+    let debounceTimerRouteEnd = null;
+
+    const routeStartInput = document.getElementById('routeStart');
+    const routeStartSuggestions = document.getElementById('routeStartSuggestions');
+
+    routeStartInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimerRouteStart);
+      const value = e.target.value.trim();
+
+      if (!value) {
+        routeStartSuggestions.style.display = 'none';
+        selectedRouteStart = null;
+        return;
+      }
+
+      debounceTimerRouteStart = setTimeout(async () => {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
+          const data = await response.json();
+
+          if (data.tips && data.tips.length > 0) {
+            routeStartSuggestions.innerHTML = data.tips.map(tip =>
+              \`<div class="suggestion-item" onclick='selectRouteStart(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            ).join('');
+            routeStartSuggestions.style.display = 'block';
+          } else {
+            routeStartSuggestions.style.display = 'none';
+          }
+        } catch (error) {
+          console.error('搜索失败:', error);
+        }
+      }, 400);
+    });
+
+    async function selectRouteStart(tip) {
+      routeStartInput.value = tip.name;
+      routeStartSuggestions.style.display = 'none';
+
+      if (tip.location) {
+        const [lon, lat] = tip.location.split(',');
+        selectedRouteStart = { lat: parseFloat(lat), lon: parseFloat(lon), name: tip.name };
+      } else {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/resolve-poi\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: tip.name })
+          });
+          const data = await response.json();
+
+          if (data.pois && data.pois.length > 0) {
+            const poi = data.pois[0];
+            const [lon, lat] = poi.location.split(',');
+            selectedRouteStart = { lat: parseFloat(lat), lon: parseFloat(lon), name: poi.name };
+          }
+        } catch (error) {
+          console.error('解析位置失败:', error);
+        }
+      }
+    }
+
+    const routeEndInput = document.getElementById('routeEnd');
+    const routeEndSuggestions = document.getElementById('routeEndSuggestions');
+
+    routeEndInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimerRouteEnd);
+      const value = e.target.value.trim();
+
+      if (!value) {
+        routeEndSuggestions.style.display = 'none';
+        selectedRouteEnd = null;
+        return;
+      }
+
+      debounceTimerRouteEnd = setTimeout(async () => {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
+          const data = await response.json();
+
+          if (data.tips && data.tips.length > 0) {
+            routeEndSuggestions.innerHTML = data.tips.map(tip =>
+              \`<div class="suggestion-item" onclick='selectRouteEnd(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+            ).join('');
+            routeEndSuggestions.style.display = 'block';
+          } else {
+            routeEndSuggestions.style.display = 'none';
+          }
+        } catch (error) {
+          console.error('搜索失败:', error);
+        }
+      }, 400);
+    });
+
+    async function selectRouteEnd(tip) {
+      routeEndInput.value = tip.name;
+      routeEndSuggestions.style.display = 'none';
+
+      if (tip.location) {
+        const [lon, lat] = tip.location.split(',');
+        selectedRouteEnd = { lat: parseFloat(lat), lon: parseFloat(lon), name: tip.name };
+      } else {
+        try {
+          const response = await fetch(\`\${API_BASE}/api/resolve-poi\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: tip.name })
+          });
+          const data = await response.json();
+
+          if (data.pois && data.pois.length > 0) {
+            const poi = data.pois[0];
+            const [lon, lat] = poi.location.split(',');
+            selectedRouteEnd = { lat: parseFloat(lat), lon: parseFloat(lon), name: poi.name };
+          }
+        } catch (error) {
+          console.error('解析位置失败:', error);
+        }
+      }
+    }
+
     // 关闭建议框
     document.addEventListener('click', (e) => {
       if (!e.target.closest('#school') && !e.target.closest('#schoolSuggestions')) {
@@ -1249,6 +1383,12 @@ const INDEX_HTML = `<!DOCTYPE html>
       }
       if (!e.target.closest('#destination') && !e.target.closest('#destinationSuggestions')) {
         destinationSuggestions.style.display = 'none';
+      }
+      if (!e.target.closest('#routeStart') && !e.target.closest('#routeStartSuggestions')) {
+        routeStartSuggestions.style.display = 'none';
+      }
+      if (!e.target.closest('#routeEnd') && !e.target.closest('#routeEndSuggestions')) {
+        routeEndSuggestions.style.display = 'none';
       }
     });
 
@@ -1479,19 +1619,41 @@ const INDEX_HTML = `<!DOCTYPE html>
     document.getElementById('routeQueryForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const startLocation = document.getElementById('routeStart').value.trim();
-      const endLocation = document.getElementById('routeEnd').value.trim();
+      const startLocationText = document.getElementById('routeStart').value.trim();
+      const endLocationText = document.getElementById('routeEnd').value.trim();
       const date = document.getElementById('routeDate').value;
+
+      // 至少需要填写一个地点
+      if (!startLocationText && !endLocationText) {
+        showMessage('请至少填写出发地或目的地', 'error');
+        return;
+      }
+
+      const requestData = { date: date || null };
+
+      // 添加出发地坐标（如果选择了）
+      if (selectedRouteStart) {
+        requestData.start_lat = selectedRouteStart.lat;
+        requestData.start_lon = selectedRouteStart.lon;
+        requestData.start_location = selectedRouteStart.name;
+      } else if (startLocationText) {
+        requestData.start_location = startLocationText;
+      }
+
+      // 添加目的地坐标（如果选择了）
+      if (selectedRouteEnd) {
+        requestData.end_lat = selectedRouteEnd.lat;
+        requestData.end_lon = selectedRouteEnd.lon;
+        requestData.end_location = selectedRouteEnd.name;
+      } else if (endLocationText) {
+        requestData.end_location = endLocationText;
+      }
 
       try {
         const response = await fetch(\`\${API_BASE}/api/search-by-route\`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            start_location: startLocation || '任意地点',
-            end_location: endLocation,
-            date: date || null
-          })
+          body: JSON.stringify(requestData)
         });
 
         const data = await response.json();
@@ -1525,6 +1687,26 @@ const INDEX_HTML = `<!DOCTYPE html>
           </div>
         \`).join('');
 
+      const tripList = data.trips ? data.trips.map(trip => {
+        let distanceInfo = '';
+        if (trip.departure_distance || trip.destination_distance) {
+          const parts = [];
+          if (trip.departure_distance) parts.push(\`出发地距离 \${trip.departure_distance}km\`);
+          if (trip.destination_distance) parts.push(\`目的地距离 \${trip.destination_distance}km\`);
+          distanceInfo = \`<div style="color: #daa520; font-size: 0.9em; margin-top: 5px;">\${parts.join(' · ')}</div>\`;
+        }
+
+        return \`
+          <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
+            <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
+            <div>出发地：\${trip.departure}</div>
+            <div>目的地：\${trip.destination}</div>
+            <div>出发时间：\${trip.departure_time}</div>
+            \${distanceInfo}
+          </div>
+        \`;
+      }).join('') : '';
+
       container.innerHTML = \`
         <div class="query-result">
           <h3 style="color: #8b4513; margin-bottom: 15px;">路线统计</h3>
@@ -1539,8 +1721,15 @@ const INDEX_HTML = `<!DOCTYPE html>
             \${timeSlots}
           </div>
 
+          \${tripList ? \`
+            <div style="margin-top: 20px;">
+              <h4 style="color: #8b4513; margin-bottom: 10px;">行程列表（不含联系方式）</h4>
+              \${tripList}
+            </div>
+          \` : ''}
+
           <div class="tip" style="margin-top: 15px;">
-            注意：此查询仅显示统计信息，不显示联系方式。如需查看联系方式，请先发布您的行程。
+            注意：此查询不显示联系方式。如需查看联系方式，请先发布您的行程。
           </div>
         </div>
       \`;
@@ -2406,29 +2595,23 @@ async function handleSearchByRoute(request, env, ip) {
   }
 
   const body = await request.json();
-  const { start_location, end_location, date } = body;
+  const { start_location, end_location, start_lat, start_lon, end_lat, end_lon, date } = body;
 
-  if (!end_location) {
-    return jsonResponse({ error: '缺少必填字段：end_location' }, 400);
-  }
-
-  // 验证搜索长度
-  if (end_location.trim().length < MIN_SEARCH_LENGTH) {
-    return jsonResponse({
-      error: `搜索关键词至少需要${MIN_SEARCH_LENGTH}个字符`,
-      hint: '请输入更具体的地点名称'
-    }, 400);
+  // 至少需要一个查询条件
+  if (!start_location && !end_location) {
+    return jsonResponse({ error: '请至少填写出发地或目的地' }, 400);
   }
 
   // 记录查询
   await recordQueryAttempt(ip, env);
 
+  // 构建查询
   let query = `
     SELECT id, school, campus, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon
     FROM trips
-    WHERE destination_location_name LIKE ?
+    WHERE 1=1
   `;
-  let params = [`%${end_location.trim()}%`];
+  let params = [];
 
   // 如果指定了日期，添加日期过滤
   if (date) {
@@ -2440,7 +2623,60 @@ async function handleSearchByRoute(request, env, ip) {
 
   query += ` ORDER BY departure_timestamp`;
 
-  const trips = await env.DB.prepare(query).bind(...params).all();
+  const allTrips = await env.DB.prepare(query).bind(...params).all();
+
+  // 距离筛选和数据处理
+  const matchedTrips = [];
+
+  for (const trip of allTrips.results) {
+    let matchScore = 0;
+    let departureDistance = null;
+    let destinationDistance = null;
+    let matched = false;
+
+    // 情况1：只填了出发地（有坐标）
+    if (start_lat && start_lon && !end_lat && !end_lon) {
+      departureDistance = haversineDistance(start_lat, start_lon, trip.departure_lat, trip.departure_lon);
+      if (departureDistance <= 1.0) {
+        matched = true;
+      }
+    }
+    // 情况2：只填了目的地（有坐标）
+    else if (!start_lat && !start_lon && end_lat && end_lon) {
+      destinationDistance = haversineDistance(end_lat, end_lon, trip.destination_lat, trip.destination_lon);
+      if (destinationDistance <= 1.0) {
+        matched = true;
+      }
+    }
+    // 情况3：填了出发地和目的地（都有坐标）
+    else if (start_lat && start_lon && end_lat && end_lon) {
+      departureDistance = haversineDistance(start_lat, start_lon, trip.departure_lat, trip.departure_lon);
+      destinationDistance = haversineDistance(end_lat, end_lon, trip.destination_lat, trip.destination_lon);
+      if (departureDistance <= 1.0 && destinationDistance <= 1.0) {
+        matched = true;
+      }
+    }
+    // 情况4：使用文本模糊匹配（没有坐标）
+    else {
+      if (start_location && trip.departure_location_name.includes(start_location)) {
+        matchScore++;
+      }
+      if (end_location && trip.destination_location_name.includes(end_location)) {
+        matchScore++;
+      }
+      if (matchScore > 0) {
+        matched = true;
+      }
+    }
+
+    if (matched) {
+      matchedTrips.push({
+        ...trip,
+        departure_distance: departureDistance ? departureDistance.toFixed(2) : null,
+        destination_distance: destinationDistance ? destinationDistance.toFixed(2) : null
+      });
+    }
+  }
 
   // 按时间段统计
   const timeSlots = {
@@ -2451,7 +2687,7 @@ async function handleSearchByRoute(request, env, ip) {
     '深夜(00:00-06:00)': 0
   };
 
-  trips.results.forEach(trip => {
+  matchedTrips.forEach(trip => {
     const time = trip.departure_time.split(':')[0];
     const hour = parseInt(time);
 
@@ -2463,14 +2699,23 @@ async function handleSearchByRoute(request, env, ip) {
   });
 
   return jsonResponse({
-    total: trips.results.length,
+    total: matchedTrips.length,
     route: {
-      start: start_location,
-      end: end_location
+      start: start_location || '任意地点',
+      end: end_location || '任意地点'
     },
     date: date || '所有日期',
     time_distribution: timeSlots,
-    summary: `该路线${date ? '当天' : ''}共有 ${trips.results.length} 个行程`
+    trips: matchedTrips.map(t => ({
+      school: t.school,
+      campus: t.campus,
+      departure: t.departure_location_name,
+      destination: t.destination_location_name,
+      departure_time: `${t.departure_date} ${t.departure_time}`,
+      departure_distance: t.departure_distance,
+      destination_distance: t.destination_distance
+    })),
+    summary: `该路线${date ? '当天' : ''}共有 ${matchedTrips.length} 个行程`
   });
 }
 
