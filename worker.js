@@ -1884,7 +1884,43 @@ const INDEX_HTML = `<!DOCTYPE html>
     function displayMatches(matches, yourTrip) {
       const container = document.getElementById('matches');
 
-      if (matches.length === 0) {
+      // 检查是否有已匹配的订单
+      const matchedTrips = matches.filter(match => match.is_matched);
+      const unmatchedTrips = matches.filter(match => !match.is_matched);
+
+      // 如果有已匹配的订单，只显示已匹配的
+      if (matchedTrips.length > 0) {
+        container.innerHTML = \`
+          <h2 style="color: #28a745; margin-bottom: 20px; border-bottom: 2px solid #28a745; padding-bottom: 10px;">
+            ✓ 您已确认匹配成功
+          </h2>
+          \${matchedTrips.map(match => \`
+            <div class="match-card" style="border: 2px solid #28a745;">
+              <div class="match-header">
+                <span class="match-name">\${match.name}</span>
+                <span class="match-distance">出发地 \${match.departure_distance}km · 目的地 \${match.destination_distance}km</span>
+              </div>
+              <div class="match-info">
+                <div>学校：\${match.school} \${match.campus ? '· ' + match.campus : ''}</div>
+                \${match.college ? \`<div>学院：\${match.college}</div>\` : ''}
+                <div>出发地：\${match.departure_location_name}</div>
+                <div>目的地：\${match.destination_location_name}</div>
+                <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
+              </div>
+              <div class="match-contact" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+                <strong>联系方式：\${match.contact}</strong>
+              </div>
+            </div>
+          \`).join('')}
+          <div class="tip" style="background-color: #d4edda; border-color: #c3e6cb;">
+            您已成功匹配 \${matchedTrips.length} 个拼车伙伴，请尽快联系对方确认出行细节。其他匹配已自动隐藏。
+          </div>
+        \`;
+        return;
+      }
+
+      // 没有已匹配的订单，显示所有未匹配的
+      if (unmatchedTrips.length === 0) {
         container.innerHTML = \`
           <div class="tip">
             暂无匹配的拼车信息，您的行程已发布，其他用户可以找到您！
@@ -1896,9 +1932,9 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       container.innerHTML = \`
         <h2 style="color: #8b4513; margin-bottom: 20px; border-bottom: 2px solid #c9a66b; padding-bottom: 10px;">
-          找到 \${matches.length} 个可能的拼车伙伴
+          找到 \${unmatchedTrips.length} 个可能的拼车伙伴
         </h2>
-        \${matches.map(match => \`
+        \${unmatchedTrips.map(match => \`
           <div class="match-card">
             <div class="match-header">
               <span class="match-name">\${match.name}</span>
@@ -1911,18 +1947,12 @@ const INDEX_HTML = `<!DOCTYPE html>
               <div>目的地：\${match.destination_location_name}</div>
               <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
             </div>
-            \${match.is_matched ? \`
-              <div class="match-contact" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
-                <strong>✓ 已匹配成功</strong>
-              </div>
-            \` : \`
-              <div class="match-contact">
-                联系方式：\${match.contact}
-              </div>
-              <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
-                确认匹配
-              </button>
-            \`}
+            <div class="match-contact">
+              联系方式：\${match.contact}
+            </div>
+            <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+              确认匹配
+            </button>
           </div>
         \`).join('')}
         <div class="tip">
@@ -2949,6 +2979,33 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
   }
 
+  // 验证坐标合法性（西安市及周边范围：经度107-110，纬度33-35）
+  const isValidCoord = (lat, lon) => {
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum)) return false;
+    // 西安及周边范围
+    return lonNum >= 107 && lonNum <= 110 && latNum >= 33 && latNum <= 35;
+  };
+
+  if (!isValidCoord(departure_lat, departure_lon)) {
+    return jsonResponse({ error: '出发地坐标异常，请重新选择地点' }, 400);
+  }
+
+  if (!isValidCoord(destination_lat, destination_lon)) {
+    return jsonResponse({ error: '目的地坐标异常，请重新选择地点' }, 400);
+  }
+
+  // 验证地点名称不为空且合理
+  if (departure_location_name.length < 2 || destination_location_name.length < 2) {
+    return jsonResponse({ error: '地点名称过短，请选择完整的地点名称' }, 400);
+  }
+
+  // 检测异常坐标：出发地和目的地坐标完全相同
+  if (departure_lat === destination_lat && departure_lon === destination_lon) {
+    return jsonResponse({ error: '出发地和目的地不能相同' }, 400);
+  }
+
   // 验证time_range值
   const timeRangeValue = parseInt(time_range);
   if (![30, 60].includes(timeRangeValue)) {
@@ -3000,6 +3057,19 @@ async function handleCreateTrip(request, env, ip) {
       error: '发布过于频繁，请稍后再试',
       hint: '为防止刷单，每5分钟最多发布3次行程'
     }, 429);
+  }
+
+  // 检测坐标作弊：检查是否有多个不同用户使用完全相同的坐标
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const sameCoordCount = await env.DB.prepare(
+    'SELECT COUNT(DISTINCT user_key) as count FROM trips WHERE ((departure_lat = ? AND departure_lon = ?) OR (destination_lat = ? AND destination_lon = ?)) AND created_at > ?'
+  ).bind(departure_lat, departure_lon, destination_lat, destination_lon, oneHourAgo).first();
+
+  if (sameCoordCount.count >= 5) {
+    return jsonResponse({
+      error: '检测到异常坐标重复使用，请使用真实地点',
+      hint: '请通过地图搜索选择真实地点，不要手动修改坐标'
+    }, 403);
   }
 
   // 检查IP异常高频风控（24小时内发布超过20次）
