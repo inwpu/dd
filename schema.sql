@@ -20,12 +20,16 @@ CREATE TABLE IF NOT EXISTS trips (
   contact TEXT NOT NULL,
   time_range INTEGER DEFAULT 60,
   ip TEXT NOT NULL,
+  user_key TEXT NOT NULL,
+  user_id TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
 
 CREATE INDEX idx_departure_timestamp ON trips(departure_timestamp);
 CREATE INDEX idx_created_at ON trips(created_at);
 CREATE INDEX idx_trips_ip ON trips(ip);
+CREATE INDEX idx_trips_user_key ON trips(user_key);
+CREATE INDEX idx_trips_user_id ON trips(user_id);
 
 -- 访客统计表
 CREATE TABLE IF NOT EXISTS visitors (
@@ -88,3 +92,30 @@ CREATE TABLE IF NOT EXISTS trip_matches (
 
 CREATE INDEX idx_trip_matches_trip1 ON trip_matches(trip_id_1);
 CREATE INDEX idx_trip_matches_trip2 ON trip_matches(trip_id_2);
+
+-- 发单频率限制表（同一天、同地点、同时段最多5次）
+CREATE TABLE IF NOT EXISTS trip_limits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_key TEXT NOT NULL,
+  date TEXT NOT NULL,
+  departure_grid TEXT NOT NULL,
+  destination_grid TEXT NOT NULL,
+  time_slot TEXT NOT NULL,
+  count INTEGER DEFAULT 0,
+  last_trip INTEGER NOT NULL,
+  UNIQUE(user_key, date, departure_grid, destination_grid, time_slot)
+);
+
+CREATE INDEX idx_trip_limits_user_date ON trip_limits(user_key, date);
+
+-- 手机号黑名单表（检测到刷单的手机号）
+CREATE TABLE IF NOT EXISTS phone_blacklist (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT NOT NULL UNIQUE,
+  reason TEXT NOT NULL,
+  banned_at INTEGER NOT NULL,
+  banned_until INTEGER NOT NULL
+);
+
+CREATE INDEX idx_phone_blacklist_phone ON phone_blacklist(phone);
+CREATE INDEX idx_phone_blacklist_banned_until ON phone_blacklist(banned_until);

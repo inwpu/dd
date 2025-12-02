@@ -889,6 +889,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       <button type="button" class="tab active" onclick="switchTab('publish')">发布行程</button>
       <button type="button" class="tab" onclick="switchTab('queryTime')">按时间查询</button>
       <button type="button" class="tab" onclick="switchTab('queryRoute')">按路线查询</button>
+      <button type="button" class="tab" onclick="switchTab('myTrips')">我的订单</button>
     </div>
 
     <div id="publishTab" class="tab-content active">
@@ -972,6 +973,14 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="form-group">
+        <label for="userIdentifier">用户标识 *</label>
+        <input type="text" id="userIdentifier" required placeholder="请输入姓名或昵称（用于订单查询）" maxlength="20">
+        <small style="color: #666; display: block; margin-top: 5px;">
+          此标识与手机号组合用于查询您的历史订单，请牢记
+        </small>
+      </div>
+
+      <div class="form-group">
         <label for="contact">联系方式 *</label>
         <input type="tel" id="contact" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
         <small style="color: #666; display: block; margin-top: 5px;">
@@ -980,7 +989,14 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="tip">
-        提示：匹配成功后建议优先电话联系，方便快速沟通。
+        <strong style="color: #d9534f;">⚠️ 防刷单规则：</strong>
+        <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+          <li>5分钟内最多发布3次行程</li>
+          <li>同一手机号1小时内最多发布2次</li>
+          <li>同一天、同地点、同时段最多发布5次</li>
+          <li>严禁使用脚本刷单，一经发现IP封禁24小时，手机号封禁7天（到期自动解封）</li>
+        </ul>
+        <p style="margin-top: 10px;">提示：匹配成功后建议优先电话联系，方便快速沟通。</p>
       </div>
 
       <button type="submit">发布行程并查找拼车</button>
@@ -1091,6 +1107,28 @@ const INDEX_HTML = `<!DOCTYPE html>
       <div id="routeQueryResult"></div>
     </div>
 
+    <div id="myTripsTab" class="tab-content">
+      <form id="myTripsForm">
+        <div class="form-group">
+          <label for="queryUserIdentifier">用户标识 *</label>
+          <input type="text" id="queryUserIdentifier" required placeholder="请输入发布行程时填写的姓名或昵称" maxlength="20">
+        </div>
+
+        <div class="form-group">
+          <label for="queryPhone">手机号 *</label>
+          <input type="tel" id="queryPhone" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
+        </div>
+
+        <div class="tip">
+          提示：输入发布行程时使用的用户标识和手机号，可查询您7天内的历史订单。
+        </div>
+
+        <button type="submit">查询我的订单</button>
+      </form>
+
+      <div id="myTripsResult"></div>
+    </div>
+
     <div class="donate-section">
       <h2 class="donate-title">支持平台运营</h2>
       <div class="donate-desc">
@@ -1166,6 +1204,30 @@ const INDEX_HTML = `<!DOCTYPE html>
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
 
     let currentTripId = null; // 保存用户发布的行程ID
+    let userId = null; // 浏览器唯一标识
+
+    // 生成或获取 user_id
+    function getOrCreateUserId() {
+      let id = localStorage.getItem('carpool_user_id');
+      if (!id) {
+        id = 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('carpool_user_id', id);
+      }
+      return id;
+    }
+
+    // 生成 user_key（前端版本）
+    async function generateUserKey(userIdentifier, phone) {
+      const text = \`\${userIdentifier}_\${phone}\`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // 页面加载时初始化 user_id
+    userId = getOrCreateUserId();
 
     // 网站运行时间计算
     function updateRuntime() {
@@ -1208,6 +1270,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       } else if (tabName === 'queryRoute') {
         document.getElementById('queryRouteTab').classList.add('active');
         document.querySelector('.tab:nth-child(3)').classList.add('active');
+      } else if (tabName === 'myTrips') {
+        document.getElementById('myTripsTab').classList.add('active');
+        document.querySelector('.tab:nth-child(4)').classList.add('active');
       }
     }
 
@@ -1263,19 +1328,26 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       const matches = SCHOOLS.filter(school => school.includes(value));
       if (matches.length > 0) {
-        schoolSuggestions.innerHTML = matches.map(school =>
-          \`<div class="suggestion-item" onclick="selectSchool('\${school}')">\${school}</div>\`
+        window.currentSchoolMatches = matches;
+        schoolSuggestions.innerHTML = matches.map((school, index) =>
+          \`<div class="suggestion-item" data-school-index="\${index}">\${school}</div>\`
         ).join('');
         schoolSuggestions.style.display = 'block';
+
+        // 使用事件委托绑定点击事件
+        setTimeout(() => {
+          const items = schoolSuggestions.querySelectorAll('.suggestion-item');
+          items.forEach((item, index) => {
+            item.onclick = () => {
+              schoolInput.value = window.currentSchoolMatches[index];
+              schoolSuggestions.style.display = 'none';
+            };
+          });
+        }, 10);
       } else {
         schoolSuggestions.style.display = 'none';
       }
     });
-
-    function selectSchool(school) {
-      schoolInput.value = school;
-      schoolSuggestions.style.display = 'none';
-    }
 
     // 出发地点搜索
     const departureInput = document.getElementById('departure');
@@ -1720,12 +1792,22 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // 验证用户标识
+      const userIdentifier = document.getElementById('userIdentifier').value.trim();
+      if (!userIdentifier) {
+        showMessage('请输入用户标识', 'error');
+        return;
+      }
+
       // 验证手机号
       const contact = document.getElementById('contact').value.trim();
       if (!validatePhone(contact)) {
         showMessage('请输入正确的11位手机号（1开头）', 'error');
         return;
       }
+
+      // 生成 user_key
+      const userKey = await generateUserKey(userIdentifier, contact);
 
       // 组装日期和时间
       const year = document.getElementById('departureYear').value;
@@ -1756,7 +1838,9 @@ const INDEX_HTML = `<!DOCTYPE html>
         departure_date: departure_date,
         departure_time: departure_time,
         contact: document.getElementById('contact').value.trim(),
-        time_range: parseInt(document.getElementById('timeRange').value)
+        time_range: parseInt(document.getElementById('timeRange').value),
+        user_key: userKey,
+        user_id: userId
       };
 
       document.getElementById('loading').style.display = 'block';
@@ -1937,6 +2021,21 @@ const INDEX_HTML = `<!DOCTYPE html>
       const date = \`\${year}-\${month}-\${day}\`;
       const startTime = \`\${startHour}:\${startMinute}\`;
       const endTime = \`\${endHour}:\${endMinute}\`;
+
+      // 验证日期在三天内
+      const queryDate = new Date(\`\${date}T00:00:00\`);
+      const now = new Date();
+      const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+      if (queryDate < now) {
+        showMessage('只能查询当前时间及未来三天内的行程', 'error');
+        return;
+      }
+
+      if (queryDate > threeDaysLater) {
+        showMessage('只能查询三天内的行程', 'error');
+        return;
+      }
 
       try {
         const response = await fetch(\`\${API_BASE}/api/search-by-time?date=\${date}&start_time=\${startTime}&end_time=\${endTime}\`);
@@ -2129,6 +2228,105 @@ const INDEX_HTML = `<!DOCTYPE html>
 
           <div class="tip" style="margin-top: 15px;">
             注意：此查询不显示联系方式。如需查看联系方式，请先发布您的行程。
+          </div>
+        </div>
+      \`;
+    }
+
+    // 我的订单查询
+    document.getElementById('myTripsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const userIdentifier = document.getElementById('queryUserIdentifier').value.trim();
+      const phone = document.getElementById('queryPhone').value.trim();
+
+      if (!userIdentifier || !phone) {
+        showMessage('请输入用户标识和手机号', 'error');
+        return;
+      }
+
+      if (!validatePhone(phone)) {
+        showMessage('请输入正确的11位手机号', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(\`\${API_BASE}/api/my-trips\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_identifier: userIdentifier,
+            phone: phone,
+            user_id: userId
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showMessage(data.error || '查询失败', 'error');
+          return;
+        }
+
+        displayMyTrips(data);
+      } catch (error) {
+        console.error('查询失败:', error);
+        showMessage('网络错误，请稍后重试', 'error');
+      }
+    });
+
+    function displayMyTrips(data) {
+      const container = document.getElementById('myTripsResult');
+
+      if (!data || data.total === 0) {
+        container.innerHTML = \`
+          <div class="tip">
+            \${data.message || '暂无订单记录'}
+          </div>
+        \`;
+        return;
+      }
+
+      container.innerHTML = \`
+        <div class="query-result">
+          <h3 style="color: #8b4513; margin-bottom: 15px;">我的订单（共 \${data.total} 条）</h3>
+
+          \${data.trips.map(trip => \`
+            <div style="padding: 15px; background: white; margin-bottom: 12px; border-radius: 6px; border: 1px solid #c9a66b; \${trip.is_expired ? 'opacity: 0.7;' : ''}">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-weight: bold; color: #8b4513;">订单 #\${trip.id}</div>
+                <div style="font-size: 0.9em; color: \${trip.is_expired ? '#999' : '#28a745'};">
+                  \${trip.is_expired ? '已过期' : '进行中'}
+                </div>
+              </div>
+
+              <div style="margin-bottom: 8px;">
+                <strong>\${trip.name}</strong> · \${trip.school} \${trip.campus || ''}
+              </div>
+
+              <div style="color: #666; margin-bottom: 5px;">
+                出发地：\${trip.departure}
+              </div>
+              <div style="color: #666; margin-bottom: 5px;">
+                目的地：\${trip.destination}
+              </div>
+              <div style="color: #666; margin-bottom: 5px;">
+                出发时间：\${trip.departure_date} \${trip.departure_time}
+              </div>
+              <div style="color: #666; margin-bottom: 5px;">
+                联系方式：\${trip.contact}
+              </div>
+
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0d0b0;">
+                <span style="color: #8b4513;">
+                  匹配状态：\${trip.match_count > 0 ? \`已确认 \${trip.match_count} 个匹配\` : '暂无匹配'}
+                </span>
+              </div>
+            </div>
+          \`).join('')}
+
+          <div class="tip" style="margin-top: 15px;">
+            仅显示7天内的订单记录
           </div>
         </div>
       \`;
@@ -2585,6 +2783,8 @@ export default {
         return handleStats(env);
       } else if (url.pathname === '/api/confirm-match') {
         return handleConfirmMatch(request, env, ip);
+      } else if (url.pathname === '/api/my-trips') {
+        return handleMyTrips(request, env, ip);
       } else if (url.pathname === '/api/cleanup') {
         return handleCleanup(env);
       } else if (url.pathname === '/images/wechhat.jpg') {
@@ -2753,10 +2953,10 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range } = body;
+  const { name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id } = body;
 
   // 验证必填字段
-  if (!name || !school || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range) {
+  if (!name || !school || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
   }
 
@@ -2770,6 +2970,19 @@ async function handleCreateTrip(request, env, ip) {
   const phonePattern = /^1\d{10}$/;
   if (!phonePattern.test(contact.trim())) {
     return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
+  }
+
+  // 检查手机号是否在黑名单中
+  const phoneBlacklist = await env.DB.prepare(
+    'SELECT * FROM phone_blacklist WHERE phone = ? AND banned_until > ?'
+  ).bind(contact, now).first();
+
+  if (phoneBlacklist) {
+    const remainingHours = Math.ceil((phoneBlacklist.banned_until - now) / (60 * 60 * 1000));
+    return jsonResponse({
+      error: `该手机号已被封禁，原因：${phoneBlacklist.reason}`,
+      hint: `剩余封禁时间：约${remainingHours}小时`
+    }, 403);
   }
 
   // 计算时间戳
@@ -2787,11 +3000,104 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '仅支持未来7天内的行程，请勿录入7天后的行程' }, 400);
   }
 
-  // 插入数据库（包含出发地和目的地）
+  // 检查IP短期高频（5分钟内超过3次）
+  const fiveMinutesAgo = now - 5 * 60 * 1000;
+  const recentTripCount = await env.DB.prepare(
+    'SELECT COUNT(*) as count FROM trips WHERE ip = ? AND created_at > ?'
+  ).bind(ip, fiveMinutesAgo).first();
+
+  if (recentTripCount.count >= 3) {
+    return jsonResponse({
+      error: '发布过于频繁，请稍后再试',
+      hint: '为防止刷单，每5分钟最多发布3次行程'
+    }, 429);
+  }
+
+  // 检查IP异常高频风控（24小时内发布超过20次）
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  const ipTripCount = await env.DB.prepare(
+    'SELECT COUNT(*) as count FROM trips WHERE ip = ? AND created_at > ?'
+  ).bind(ip, oneDayAgo).first();
+
+  if (ipTripCount.count >= 20) {
+    // 临时封禁24小时
+    await env.DB.prepare(`
+      INSERT INTO ip_bans (ip, banned_until, reason)
+      VALUES (?, ?, ?)
+      ON CONFLICT(ip) DO UPDATE SET banned_until = ?, reason = ?
+    `).bind(ip, now + 24 * 60 * 60 * 1000, '异常高频发单', now + 24 * 60 * 60 * 1000, '异常高频发单').run();
+
+    return jsonResponse({ error: '检测到异常高频发单行为，您的IP已被临时封禁24小时' }, 403);
+  }
+
+  // 检查相同手机号短期重复（1小时内同一手机号最多2次）
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const phoneCount = await env.DB.prepare(
+    'SELECT COUNT(*) as count FROM trips WHERE contact = ? AND created_at > ?'
+  ).bind(contact, oneHourAgo).first();
+
+  if (phoneCount.count >= 2) {
+    return jsonResponse({
+      error: '该手机号1小时内已发布过行程，请勿重复发单',
+      hint: '如需修改行程，请稍后再试'
+    }, 429);
+  }
+
+  // 检测机器人行为特征（姓名包含"测试"、"test"等）
+  const suspiciousPatterns = /测试|test|bot|script|批量|刷单|垃圾|假|虚假/i;
+  if (suspiciousPatterns.test(name) || suspiciousPatterns.test(school)) {
+    // 封禁IP
+    await env.DB.prepare(`
+      INSERT INTO ip_bans (ip, banned_until, reason)
+      VALUES (?, ?, ?)
+      ON CONFLICT(ip) DO UPDATE SET banned_until = ?, reason = ?
+    `).bind(ip, now + 24 * 60 * 60 * 1000, '检测到刷单行为', now + 24 * 60 * 60 * 1000, '检测到刷单行为').run();
+
+    // 封禁手机号
+    await env.DB.prepare(`
+      INSERT INTO phone_blacklist (phone, reason, banned_at, banned_until)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(phone) DO UPDATE SET banned_until = ?, reason = ?
+    `).bind(contact, '使用脚本刷单', now, now + 7 * 24 * 60 * 60 * 1000, now + 7 * 24 * 60 * 60 * 1000, '使用脚本刷单').run();
+
+    return jsonResponse({
+      error: '检测到异常发单行为，您的IP和手机号已被封禁',
+      hint: '请勿使用脚本刷单。IP封禁24小时，手机号封禁7天'
+    }, 403);
+  }
+
+  // 生成地理网格和时间段
+  const departureGrid = generateGrid(departure_lat, departure_lon);
+  const destinationGrid = generateGrid(destination_lat, destination_lon);
+  const timeSlot = generateTimeSlot(departureTimestamp);
+  const today = new Date(departureTimestamp).toISOString().split('T')[0];
+
+  // 检查发单频率限制（同一天、同地点、同时段最多5次）
+  const tripLimit = await env.DB.prepare(`
+    SELECT count FROM trip_limits
+    WHERE user_key = ? AND date = ? AND departure_grid = ? AND destination_grid = ? AND time_slot = ?
+  `).bind(user_key, today, departureGrid, destinationGrid, timeSlot).first();
+
+  if (tripLimit && tripLimit.count >= 5) {
+    return jsonResponse({
+      error: '同一天、同地点、同时段最多发布5次行程，请勿重复发单',
+      hint: '如需修改行程，请稍后再试或更改出发时间'
+    }, 429);
+  }
+
+  // 插入数据库（包含出发地和目的地、user_key、user_id）
   const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(name, school, campus || '', college || '', departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, now).run();
+    INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(name, school, campus || '', college || '', departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, user_key, user_id, now).run();
+
+  // 更新发单频率计数
+  await env.DB.prepare(`
+    INSERT INTO trip_limits (user_key, date, departure_grid, destination_grid, time_slot, count, last_trip)
+    VALUES (?, ?, ?, ?, ?, 1, ?)
+    ON CONFLICT(user_key, date, departure_grid, destination_grid, time_slot)
+    DO UPDATE SET count = count + 1, last_trip = ?
+  `).bind(user_key, today, departureGrid, destinationGrid, timeSlot, now, now).run();
 
   // 清理过期数据
   await cleanupExpiredTrips(env);
@@ -2862,14 +3168,25 @@ async function handleMatch(request, env, ip) {
     ORDER BY departure_timestamp
   `).bind(minTime, maxTime, trip_id).all();
 
-  // 两点一线匹配：出发地≤1km 且 目的地≤1km（显示所有匹配）
+  // 两点一线匹配：使用智能匹配（距离 + 名称相似度）
   const matches = [];
   for (const trip of trips.results) {
     const departureDistance = haversineDistance(userDepartureLat, userDepartureLon, trip.departure_lat, trip.departure_lon);
     const destinationDistance = haversineDistance(userDestinationLat, userDestinationLon, trip.destination_lat, trip.destination_lon);
 
-    // 必须同时满足：出发地≤1km 且 目的地≤1km
-    if (departureDistance <= 1.0 && destinationDistance <= 1.0) {
+    // 智能匹配：出发地和目的地都要匹配
+    const departureMatch = isLocationMatch(
+      userDepartureLat, userDepartureLon, userTrip.departure_location_name,
+      trip.departure_lat, trip.departure_lon, trip.departure_location_name
+    );
+
+    const destinationMatch = isLocationMatch(
+      userDestinationLat, userDestinationLon, userTrip.destination_location_name,
+      trip.destination_lat, trip.destination_lon, trip.destination_location_name
+    );
+
+    // 必须同时满足：出发地匹配 且 目的地匹配
+    if (departureMatch && destinationMatch) {
       // 检查是否已匹配
       const [trip1, trip2] = trip_id < trip.id ? [trip_id, trip.id] : [trip.id, trip_id];
       const matchRecord = await env.DB.prepare(
@@ -2954,6 +3271,81 @@ async function handleConfirmMatch(request, env, ip) {
   }
 }
 
+// 查询我的订单（双因子验证：user_key + user_id）
+async function handleMyTrips(request, env, ip) {
+  const body = await request.json();
+  const { user_identifier, phone, user_id } = body;
+
+  if (!user_identifier || !phone || !user_id) {
+    return jsonResponse({ error: '缺少必要参数' }, 400);
+  }
+
+  // 验证手机号格式
+  const phonePattern = /^1\d{10}$/;
+  if (!phonePattern.test(phone.trim())) {
+    return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
+  }
+
+  // 生成 user_key
+  const userKey = await generateUserKey(user_identifier, phone);
+
+  // 查询7天内的订单（双因子验证）
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const trips = await env.DB.prepare(`
+    SELECT id, name, school, campus, college, departure_location_name, destination_location_name,
+           departure_date, departure_time, departure_timestamp, contact, created_at
+    FROM trips
+    WHERE user_key = ? AND user_id = ? AND created_at > ?
+    ORDER BY departure_timestamp ASC
+  `).bind(userKey, user_id, sevenDaysAgo).all();
+
+  if (!trips.results || trips.results.length === 0) {
+    return jsonResponse({
+      total: 0,
+      trips: [],
+      message: '未找到您的订单记录，请确认输入的用户标识和手机号是否正确'
+    });
+  }
+
+  // 查询每个订单的匹配状态
+  const tripsWithStatus = await Promise.all(trips.results.map(async trip => {
+    // 查询该订单的所有匹配确认记录
+    const matches = await env.DB.prepare(`
+      SELECT * FROM trip_matches
+      WHERE trip_id_1 = ? OR trip_id_2 = ?
+      OR trip_id_1 = ? OR trip_id_2 = ?
+    `).bind(
+      Math.min(trip.id, trip.id),
+      Math.max(trip.id, trip.id),
+      Math.min(trip.id, trip.id),
+      Math.max(trip.id, trip.id)
+    ).all();
+
+    const matchCount = matches.results ? matches.results.length : 0;
+
+    return {
+      id: trip.id,
+      name: trip.name,
+      school: trip.school,
+      campus: trip.campus,
+      college: trip.college,
+      departure: trip.departure_location_name,
+      destination: trip.destination_location_name,
+      departure_date: trip.departure_date,
+      departure_time: trip.departure_time,
+      contact: trip.contact,
+      match_count: matchCount,
+      created_at: trip.created_at,
+      is_expired: trip.departure_timestamp < Date.now()
+    };
+  }));
+
+  return jsonResponse({
+    total: tripsWithStatus.length,
+    trips: tripsWithStatus
+  });
+}
+
 async function handleStats(env) {
   // UV（独立访客数）
   const totalVisitors = await env.DB.prepare(
@@ -2999,6 +3391,19 @@ async function handleSearchByTime(request, env, ip) {
 
   if (!date || !startTime || !endTime) {
     return jsonResponse({ error: '缺少必填参数：date, start_time, end_time' }, 400);
+  }
+
+  // 验证日期在三天内
+  const queryDate = new Date(`${date}T00:00:00`).getTime();
+  const now = Date.now();
+  const threeDaysLater = now + 3 * 24 * 60 * 60 * 1000;
+
+  if (queryDate < now) {
+    return jsonResponse({ error: '只能查询当前时间及未来三天内的行程' }, 400);
+  }
+
+  if (queryDate > threeDaysLater) {
+    return jsonResponse({ error: '只能查询三天内的行程' }, 400);
   }
 
   // 记录查询
@@ -3249,11 +3654,56 @@ async function handleCleanup(env) {
 
 async function cleanupExpiredTrips(env) {
   const now = Date.now();
-  const result = await env.DB.prepare(
+
+  // 清理过期行程
+  const tripsResult = await env.DB.prepare(
     'DELETE FROM trips WHERE departure_timestamp < ?'
   ).bind(now).run();
 
-  return result.meta.changes;
+  // 清理过期IP封禁
+  const ipBansResult = await env.DB.prepare(
+    'DELETE FROM ip_bans WHERE banned_until < ?'
+  ).bind(now).run();
+
+  // 清理过期手机号封禁
+  const phoneBlacklistResult = await env.DB.prepare(
+    'DELETE FROM phone_blacklist WHERE banned_until < ?'
+  ).bind(now).run();
+
+  // 清理7天前的发单频率记录
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const tripLimitsResult = await env.DB.prepare(
+    'DELETE FROM trip_limits WHERE last_trip < ?'
+  ).bind(sevenDaysAgo).run();
+
+  // 清理7天前的匹配频率记录
+  const matchLimitsResult = await env.DB.prepare(
+    'DELETE FROM match_limits WHERE last_match < ?'
+  ).bind(sevenDaysAgo).run();
+
+  // 清理1小时前的查询频率记录
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const queryLimitsResult = await env.DB.prepare(
+    'DELETE FROM query_limits WHERE last_query < ?'
+  ).bind(oneHourAgo).run();
+
+  console.log('自动清理完成:', {
+    trips: tripsResult.meta.changes,
+    ipBans: ipBansResult.meta.changes,
+    phoneBlacklist: phoneBlacklistResult.meta.changes,
+    tripLimits: tripLimitsResult.meta.changes,
+    matchLimits: matchLimitsResult.meta.changes,
+    queryLimits: queryLimitsResult.meta.changes
+  });
+
+  return {
+    trips: tripsResult.meta.changes,
+    ipBans: ipBansResult.meta.changes,
+    phoneBlacklist: phoneBlacklistResult.meta.changes,
+    tripLimits: tripLimitsResult.meta.changes,
+    matchLimits: matchLimitsResult.meta.changes,
+    queryLimits: queryLimitsResult.meta.changes
+  };
 }
 
 // Haversine距离计算（单位：km）
@@ -3270,6 +3720,106 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 function toRad(deg) {
   return deg * (Math.PI / 180);
+}
+
+// 地点名称相似度检测（用于匹配同一地点的不同入口）
+function isSimilarLocation(name1, name2) {
+  // 清理地点名称：去除括号内容、方向词、门等
+  const clean = (str) => {
+    return str
+      .replace(/\(.*?\)/g, '') // 去除括号及内容
+      .replace(/（.*?）/g, '') // 去除中文括号
+      .replace(/[东南西北]门/g, '') // 去除方向门
+      .replace(/[东南西北]区/g, '区') // 统一区名
+      .replace(/[东南西北]侧/g, '') // 去除方位
+      .replace(/[一二三四五六七八九十\d]+号门/g, '') // 去除几号门
+      .replace(/出入口/g, '')
+      .replace(/\s+/g, '') // 去除空格
+      .trim();
+  };
+
+  const cleaned1 = clean(name1);
+  const cleaned2 = clean(name2);
+
+  // 完全匹配
+  if (cleaned1 === cleaned2) return true;
+
+  // 包含关系（一个是另一个的子串）
+  if (cleaned1.includes(cleaned2) || cleaned2.includes(cleaned1)) {
+    return true;
+  }
+
+  // 计算最长公共子串
+  const longestCommonSubstring = (s1, s2) => {
+    const m = s1.length;
+    const n = s2.length;
+    let maxLen = 0;
+    let endIndex = 0;
+    const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (s1[i - 1] === s2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+          if (dp[i][j] > maxLen) {
+            maxLen = dp[i][j];
+            endIndex = i;
+          }
+        }
+      }
+    }
+    return s1.substring(endIndex - maxLen, endIndex);
+  };
+
+  const lcs = longestCommonSubstring(cleaned1, cleaned2);
+  const minLen = Math.min(cleaned1.length, cleaned2.length);
+
+  // 公共子串长度占较短名称的70%以上
+  if (lcs.length >= minLen * 0.7) {
+    return true;
+  }
+
+  return false;
+}
+
+// 智能匹配判断（距离 + 名称相似度）
+function isLocationMatch(lat1, lon1, name1, lat2, lon2, name2) {
+  const distance = haversineDistance(lat1, lon1, lat2, lon2);
+  const nameSimilar = isSimilarLocation(name1, name2);
+
+  // 规则1：距离≤1km，直接匹配
+  if (distance <= 1.0) return true;
+
+  // 规则2：距离≤3km 且 名称相似（同一大型场所不同入口）
+  if (distance <= 3.0 && nameSimilar) return true;
+
+  return false;
+}
+
+// 生成 user_key（用户标识 + 手机号的哈希）
+async function generateUserKey(userIdentifier, phone) {
+  const text = `${userIdentifier}_${phone}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 生成地理网格标识（用于限制相同地点发单）
+function generateGrid(lat, lon) {
+  // 使用0.01度作为网格大小（约1km）
+  const gridLat = Math.floor(lat * 100) / 100;
+  const gridLon = Math.floor(lon * 100) / 100;
+  return `${gridLat},${gridLon}`;
+}
+
+// 生成时间段标识（每2小时一个时间段）
+function generateTimeSlot(timestamp) {
+  const date = new Date(timestamp);
+  const hour = date.getHours();
+  const slot = Math.floor(hour / 2) * 2;
+  return `${slot}-${slot + 2}`;
 }
 
 function jsonResponse(data, status = 200) {

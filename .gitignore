@@ -26,3 +26,21 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Build and temporary files
+worker.bundled.js
+worker.source.js
+index.html
+stats.html
+build.js
+
+# Documentation (generated)
+DATABASE_SETUP.md
+CHANGELOG.md
+*.txt
+
+# Test scripts
+shuadan.js
+
+# Claude Code cache
+.claude/
