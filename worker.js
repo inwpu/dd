@@ -588,12 +588,28 @@ const INDEX_HTML = `<!DOCTYPE html>
       width: 100%;
       max-width: 100%;
       overflow: hidden;
+      background: #f5f0e8;
+      border-radius: 8px;
+      padding: 20px;
+      border: 1px solid #c9a66b;
+      box-shadow: 0 2px 8px rgba(139, 69, 19, 0.1);
     }
 
     #comments .giscus,
     #comments .giscus-frame {
       width: 100% !important;
       max-width: 100% !important;
+      border-radius: 6px;
+    }
+
+    /* 评论区标题 */
+    .comments-title {
+      color: #8b4513;
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #c9a66b;
     }
 
     @media (max-width: 768px) {
@@ -684,6 +700,16 @@ const INDEX_HTML = `<!DOCTYPE html>
         flex-direction: column;
         gap: 15px;
         align-items: center;
+      }
+
+      #comments {
+        padding: 15px;
+        margin-top: 30px;
+      }
+
+      .comments-title {
+        font-size: 1.3em;
+        margin-bottom: 12px;
       }
 
       .qr-button {
@@ -978,7 +1004,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
     </div>
 
-    <div id="comments" style="margin-top: 50px;"></div>
+    <div id="comments" style="margin-top: 50px;">
+      <div class="comments-title">💬 留言评论</div>
+    </div>
 
     <div class="footer">
       <div class="stats">
