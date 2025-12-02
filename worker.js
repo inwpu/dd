@@ -1294,16 +1294,27 @@ const INDEX_HTML = `<!DOCTYPE html>
           const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
           const data = await response.json();
 
+          console.log('出发地搜索结果:', data);
+
+          if (!response.ok) {
+            departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${data.error || '服务异常'}</div>\`;
+            departureSuggestions.style.display = 'block';
+            return;
+          }
+
           if (data.tips && data.tips.length > 0) {
             departureSuggestions.innerHTML = data.tips.map(tip =>
               \`<div class="suggestion-item" onclick='selectDeparture(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             departureSuggestions.style.display = 'block';
           } else {
-            departureSuggestions.style.display = 'none';
+            departureSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
+            departureSuggestions.style.display = 'block';
           }
         } catch (error) {
           console.error('搜索失败:', error);
+          departureSuggestions.innerHTML = '<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误，请重试</div>';
+          departureSuggestions.style.display = 'block';
         }
       }, 400);
     });
@@ -1353,16 +1364,27 @@ const INDEX_HTML = `<!DOCTYPE html>
           const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
           const data = await response.json();
 
+          console.log('目的地搜索结果:', data);
+
+          if (!response.ok) {
+            destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${data.error || '服务异常'}</div>\`;
+            destinationSuggestions.style.display = 'block';
+            return;
+          }
+
           if (data.tips && data.tips.length > 0) {
             destinationSuggestions.innerHTML = data.tips.map(tip =>
               \`<div class="suggestion-item" onclick='selectDestination(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             destinationSuggestions.style.display = 'block';
           } else {
-            destinationSuggestions.style.display = 'none';
+            destinationSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
+            destinationSuggestions.style.display = 'block';
           }
         } catch (error) {
           console.error('搜索失败:', error);
+          destinationSuggestions.innerHTML = '<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误，请重试</div>';
+          destinationSuggestions.style.display = 'block';
         }
       }, 400);
     });
@@ -1418,16 +1440,21 @@ const INDEX_HTML = `<!DOCTYPE html>
           const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
           const data = await response.json();
 
+          console.log('路线查询-出发地搜索结果:', data);
+
           if (data.tips && data.tips.length > 0) {
             routeStartSuggestions.innerHTML = data.tips.map(tip =>
               \`<div class="suggestion-item" onclick='selectRouteStart(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeStartSuggestions.style.display = 'block';
           } else {
-            routeStartSuggestions.style.display = 'none';
+            routeStartSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
+            routeStartSuggestions.style.display = 'block';
           }
         } catch (error) {
           console.error('搜索失败:', error);
+          routeStartSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">搜索失败，请重试</div>';
+          routeStartSuggestions.style.display = 'block';
         }
       }, 400);
     });
@@ -1477,16 +1504,21 @@ const INDEX_HTML = `<!DOCTYPE html>
           const response = await fetch(\`\${API_BASE}/api/search?keywords=\${encodeURIComponent(value)}\`);
           const data = await response.json();
 
+          console.log('路线查询-目的地搜索结果:', data);
+
           if (data.tips && data.tips.length > 0) {
             routeEndSuggestions.innerHTML = data.tips.map(tip =>
               \`<div class="suggestion-item" onclick='selectRouteEnd(\${JSON.stringify(tip)})'>\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeEndSuggestions.style.display = 'block';
           } else {
-            routeEndSuggestions.style.display = 'none';
+            routeEndSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
+            routeEndSuggestions.style.display = 'block';
           }
         } catch (error) {
           console.error('搜索失败:', error);
+          routeEndSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">搜索失败，请重试</div>';
+          routeEndSuggestions.style.display = 'block';
         }
       }, 400);
     });
@@ -2562,15 +2594,29 @@ async function handleSearch(request, env) {
 
   const AMAP_KEY = env.AMAP_KEY;
   if (!AMAP_KEY) {
-    return jsonResponse({ error: 'API key not configured' }, 500);
+    console.error('高德地图API Key未配置');
+    return jsonResponse({ error: 'API key not configured', tips: [] }, 500);
   }
 
   const apiUrl = `https://restapi.amap.com/v3/assistant/inputtips?key=${AMAP_KEY}&keywords=${encodeURIComponent(keywords)}&city=西安`;
 
-  const response = await fetch(apiUrl);
-  const data = await response.json();
+  try {
+    const response = await fetch(apiUrl);
+    const data = await response.json();
 
-  return jsonResponse(data);
+    console.log('高德API返回:', { keywords, status: data.status, count: data.count, info: data.info });
+
+    // 高德API返回格式：status=1表示成功，tips是结果数组
+    if (data.status === '0') {
+      console.error('高德API错误:', data.info);
+      return jsonResponse({ error: data.info, tips: [] });
+    }
+
+    return jsonResponse(data);
+  } catch (error) {
+    console.error('高德API请求失败:', error);
+    return jsonResponse({ error: 'API request failed', tips: [] }, 500);
+  }
 }
 
 // 高德POI解析
