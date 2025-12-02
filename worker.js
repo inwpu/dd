@@ -215,14 +215,18 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     .suggestions {
       position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
       background: white;
       border: 1.5px solid #c9a66b;
       border-radius: 6px;
       max-height: 200px;
       overflow-y: auto;
-      width: calc(100% - 0px);
-      z-index: 1000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 100%;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      margin-top: 4px;
     }
 
     .suggestion-item {
@@ -232,12 +236,20 @@ const INDEX_HTML = `<!DOCTYPE html>
       transition: background 0.2s;
     }
 
-    .suggestion-item:hover {
+    .suggestion-item:hover,
+    .suggestion-item:active {
       background: #fff8dc;
     }
 
     .suggestion-item:last-child {
       border-bottom: none;
+    }
+
+    .suggestion-item small {
+      display: block;
+      color: #999;
+      margin-top: 3px;
+      font-size: 0.85em;
     }
 
     .matches {
@@ -599,19 +611,21 @@ const INDEX_HTML = `<!DOCTYPE html>
     .datetime-picker {
       display: flex;
       gap: 8px;
-      flex-wrap: wrap;
+      align-items: center;
+      flex-wrap: nowrap;
     }
 
     .datetime-picker select {
-      padding: 10px 12px;
+      padding: 10px 8px;
       border: 2px solid #c9a66b;
       border-radius: 6px;
       background: white;
       color: #5d4037;
-      font-size: 1em;
+      font-size: 0.95em;
       cursor: pointer;
       transition: all 0.3s ease;
-      min-width: 80px;
+      flex: 1;
+      min-width: 60px;
     }
 
     .datetime-picker select:hover {
@@ -729,6 +743,16 @@ const INDEX_HTML = `<!DOCTYPE html>
         margin-top: 30px;
       }
 
+      .datetime-picker {
+        flex-wrap: wrap;
+      }
+
+      .datetime-picker select {
+        font-size: 0.9em;
+        padding: 8px 6px;
+        min-width: 55px;
+      }
+
       .qr-button {
         font-size: 1em;
         padding: 10px 25px;
@@ -781,12 +805,26 @@ const INDEX_HTML = `<!DOCTYPE html>
       }
 
       .suggestions {
-        max-height: 150px;
+        max-height: 200px;
         font-size: 0.9em;
+        z-index: 99999;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        border-width: 2px;
       }
 
       .suggestion-item {
-        padding: 10px;
+        padding: 14px 12px;
+        font-size: 1em;
+        border-bottom: 1px solid #f0e6d2;
+        -webkit-tap-highlight-color: rgba(139, 69, 19, 0.1);
+      }
+
+      .suggestion-item:last-child {
+        border-bottom: none;
+      }
+
+      input[type="text"] {
+        font-size: 16px !important;
       }
     }
 
