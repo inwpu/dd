@@ -2961,6 +2961,12 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
   }
 
+  // 计算时间戳
+  const departureDateTime = new Date(`${departure_date}T${departure_time}:00`);
+  const departureTimestamp = departureDateTime.getTime();
+  const now = Date.now();
+  const sevenDaysLater = now + SEVEN_DAYS;
+
   // 检查手机号是否在黑名单中
   const phoneBlacklist = await env.DB.prepare(
     'SELECT * FROM phone_blacklist WHERE phone = ? AND banned_until > ?'
@@ -2973,12 +2979,6 @@ async function handleCreateTrip(request, env, ip) {
       hint: `剩余封禁时间：约${remainingHours}小时`
     }, 403);
   }
-
-  // 计算时间戳
-  const departureDateTime = new Date(`${departure_date}T${departure_time}:00`);
-  const departureTimestamp = departureDateTime.getTime();
-  const now = Date.now();
-  const sevenDaysLater = now + SEVEN_DAYS;
 
   // 验证时间范围
   if (departureTimestamp < now) {
