@@ -973,14 +973,6 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="form-group">
-        <label for="userIdentifier">用户标识 *</label>
-        <input type="text" id="userIdentifier" required placeholder="请输入姓名或昵称（用于订单查询）" maxlength="20">
-        <small style="color: #666; display: block; margin-top: 5px;">
-          此标识与手机号组合用于查询您的历史订单，请牢记
-        </small>
-      </div>
-
-      <div class="form-group">
         <label for="contact">联系方式 *</label>
         <input type="tel" id="contact" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
         <small style="color: #666; display: block; margin-top: 5px;">
@@ -989,7 +981,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="tip">
-        <strong style="color: #d9534f;">⚠️ 防刷单规则：</strong>
+        <strong style="color: #d9534f;"> 防刷单规则：</strong>
         <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
           <li>5分钟内最多发布3次行程</li>
           <li>同一手机号1小时内最多发布2次</li>
@@ -1110,8 +1102,8 @@ const INDEX_HTML = `<!DOCTYPE html>
     <div id="myTripsTab" class="tab-content">
       <form id="myTripsForm">
         <div class="form-group">
-          <label for="queryUserIdentifier">用户标识 *</label>
-          <input type="text" id="queryUserIdentifier" required placeholder="请输入发布行程时填写的姓名或昵称" maxlength="20">
+          <label for="queryUserName">姓名 *</label>
+          <input type="text" id="queryUserName" required placeholder="请输入发布行程时填写的姓名" maxlength="20">
         </div>
 
         <div class="form-group">
@@ -1120,7 +1112,7 @@ const INDEX_HTML = `<!DOCTYPE html>
         </div>
 
         <div class="tip">
-          提示：输入发布行程时使用的用户标识和手机号，可查询您7天内的历史订单。
+          提示：输入发布行程时使用的姓名和手机号，可查询您7天内的历史订单。
         </div>
 
         <button type="submit">查询我的订单</button>
@@ -1792,13 +1784,6 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
-      // 验证用户标识
-      const userIdentifier = document.getElementById('userIdentifier').value.trim();
-      if (!userIdentifier) {
-        showMessage('请输入用户标识', 'error');
-        return;
-      }
-
       // 验证手机号
       const contact = document.getElementById('contact').value.trim();
       if (!validatePhone(contact)) {
@@ -1806,8 +1791,11 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
-      // 生成 user_key
-      const userKey = await generateUserKey(userIdentifier, contact);
+      // 获取姓名（作为用户标识）
+      const name = document.getElementById('name').value.trim();
+
+      // 生成 user_key（使用姓名作为标识）
+      const userKey = await generateUserKey(name, contact);
 
       // 组装日期和时间
       const year = document.getElementById('departureYear').value;
@@ -2024,11 +2012,12 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       // 验证日期在三天内
       const queryDate = new Date(\`\${date}T00:00:00\`);
-      const now = new Date();
-      const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // 设置为今天0点
+      const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-      if (queryDate < now) {
-        showMessage('只能查询当前时间及未来三天内的行程', 'error');
+      if (queryDate < today) {
+        showMessage('只能查询今天及未来三天内的行程', 'error');
         return;
       }
 
@@ -2237,11 +2226,11 @@ const INDEX_HTML = `<!DOCTYPE html>
     document.getElementById('myTripsForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const userIdentifier = document.getElementById('queryUserIdentifier').value.trim();
+      const userName = document.getElementById('queryUserName').value.trim();
       const phone = document.getElementById('queryPhone').value.trim();
 
-      if (!userIdentifier || !phone) {
-        showMessage('请输入用户标识和手机号', 'error');
+      if (!userName || !phone) {
+        showMessage('请输入姓名和手机号', 'error');
         return;
       }
 
@@ -2255,7 +2244,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_identifier: userIdentifier,
+            user_identifier: userName,
             phone: phone,
             user_id: userId
           })
@@ -3396,10 +3385,13 @@ async function handleSearchByTime(request, env, ip) {
   // 验证日期在三天内
   const queryDate = new Date(`${date}T00:00:00`).getTime();
   const now = Date.now();
-  const threeDaysLater = now + 3 * 24 * 60 * 60 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStart = today.getTime();
+  const threeDaysLater = todayStart + 3 * 24 * 60 * 60 * 1000;
 
-  if (queryDate < now) {
-    return jsonResponse({ error: '只能查询当前时间及未来三天内的行程' }, 400);
+  if (queryDate < todayStart) {
+    return jsonResponse({ error: '只能查询今天及未来三天内的行程' }, 400);
   }
 
   if (queryDate > threeDaysLater) {
