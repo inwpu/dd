@@ -1303,25 +1303,28 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
 
           if (data.tips && data.tips.length > 0) {
+            // 保存数据到全局
+            window.currentDepartureTips = data.tips;
+
             departureSuggestions.innerHTML = data.tips.map((tip, index) =>
               \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             departureSuggestions.style.display = 'block';
 
-            // 绑定点击事件
-            window.currentDepartureTips = data.tips;
-            document.querySelectorAll('#departureSuggestions .suggestion-item').forEach((item, index) => {
-              if (item.dataset.tipIndex !== undefined) {
+            // 使用事件委托绑定点击事件
+            setTimeout(() => {
+              const items = departureSuggestions.querySelectorAll('.suggestion-item');
+              items.forEach((item, index) => {
                 item.onclick = () => selectDeparture(window.currentDepartureTips[index]);
-              }
-            });
+              });
+            }, 10);
           } else {
             departureSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             departureSuggestions.style.display = 'block';
           }
         } catch (error) {
-          console.error('搜索失败:', error);
-          departureSuggestions.innerHTML = '<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误，请重试</div>';
+          console.error('搜索失败:', error, error.stack);
+          departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
           departureSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1381,25 +1384,28 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
 
           if (data.tips && data.tips.length > 0) {
+            // 保存数据到全局
+            window.currentDestinationTips = data.tips;
+
             destinationSuggestions.innerHTML = data.tips.map((tip, index) =>
               \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             destinationSuggestions.style.display = 'block';
 
-            // 绑定点击事件
-            window.currentDestinationTips = data.tips;
-            document.querySelectorAll('#destinationSuggestions .suggestion-item').forEach((item, index) => {
-              if (item.dataset.tipIndex !== undefined) {
+            // 使用事件委托绑定点击事件
+            setTimeout(() => {
+              const items = destinationSuggestions.querySelectorAll('.suggestion-item');
+              items.forEach((item, index) => {
                 item.onclick = () => selectDestination(window.currentDestinationTips[index]);
-              }
-            });
+              });
+            }, 10);
           } else {
             destinationSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             destinationSuggestions.style.display = 'block';
           }
         } catch (error) {
-          console.error('搜索失败:', error);
-          destinationSuggestions.innerHTML = '<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误，请重试</div>';
+          console.error('搜索失败:', error, error.stack);
+          destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
           destinationSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1459,25 +1465,28 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('路线查询-出发地搜索结果:', data);
 
           if (data.tips && data.tips.length > 0) {
+            // 保存数据到全局
+            window.currentRouteStartTips = data.tips;
+
             routeStartSuggestions.innerHTML = data.tips.map((tip, index) =>
               \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeStartSuggestions.style.display = 'block';
 
-            // 绑定点击事件
-            window.currentRouteStartTips = data.tips;
-            document.querySelectorAll('#routeStartSuggestions .suggestion-item').forEach((item, index) => {
-              if (item.dataset.tipIndex !== undefined) {
+            // 使用事件委托绑定点击事件
+            setTimeout(() => {
+              const items = routeStartSuggestions.querySelectorAll('.suggestion-item');
+              items.forEach((item, index) => {
                 item.onclick = () => selectRouteStart(window.currentRouteStartTips[index]);
-              }
-            });
+              });
+            }, 10);
           } else {
             routeStartSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             routeStartSuggestions.style.display = 'block';
           }
         } catch (error) {
-          console.error('搜索失败:', error);
-          routeStartSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">搜索失败，请重试</div>';
+          console.error('搜索失败:', error, error.stack);
+          routeStartSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
           routeStartSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1531,25 +1540,28 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('路线查询-目的地搜索结果:', data);
 
           if (data.tips && data.tips.length > 0) {
+            // 保存数据到全局
+            window.currentRouteEndTips = data.tips;
+
             routeEndSuggestions.innerHTML = data.tips.map((tip, index) =>
               \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
             ).join('');
             routeEndSuggestions.style.display = 'block';
 
-            // 绑定点击事件
-            window.currentRouteEndTips = data.tips;
-            document.querySelectorAll('#routeEndSuggestions .suggestion-item').forEach((item, index) => {
-              if (item.dataset.tipIndex !== undefined) {
+            // 使用事件委托绑定点击事件
+            setTimeout(() => {
+              const items = routeEndSuggestions.querySelectorAll('.suggestion-item');
+              items.forEach((item, index) => {
                 item.onclick = () => selectRouteEnd(window.currentRouteEndTips[index]);
-              }
-            });
+              });
+            }, 10);
           } else {
             routeEndSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">未找到相关地点，请输入更具体的地址</div>';
             routeEndSuggestions.style.display = 'block';
           }
         } catch (error) {
-          console.error('搜索失败:', error);
-          routeEndSuggestions.innerHTML = '<div class="suggestion-item" style="color:#999;cursor:default;">搜索失败，请重试</div>';
+          console.error('搜索失败:', error, error.stack);
+          routeEndSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
           routeEndSuggestions.style.display = 'block';
         }
       }, 400);
