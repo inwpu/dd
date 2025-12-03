@@ -1076,7 +1076,8 @@ const INDEX_HTML = `<!DOCTYPE html>
         </div>
 
         <div class="tip">
-          提示：可以只填写出发地或目的地，也可以两者都填写进行精确匹配（两点距离各≤1km）
+          <strong>提示：</strong>可以只填写出发地或目的地，也可以两者都填写进行精确匹配（两点距离各≤1km）<br>
+          日期为可选项，仅支持查询今天及未来3天内的行程数据
         </div>
 
         <button type="submit">查询该路线统计</button>
@@ -1624,9 +1625,6 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     // 关闭建议框
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('#school') && !e.target.closest('#schoolSuggestions')) {
-        schoolSuggestions.style.display = 'none';
-      }
       if (!e.target.closest('#departure') && !e.target.closest('#departureSuggestions')) {
         departureSuggestions.style.display = 'none';
       }
@@ -2085,6 +2083,24 @@ const INDEX_HTML = `<!DOCTYPE html>
       if (!startLocationText && !endLocationText) {
         showMessage('请至少填写出发地或目的地', 'error');
         return;
+      }
+
+      // 验证日期范围（如果填写了日期）
+      if (date) {
+        const queryDate = new Date(\`\${date}T00:00:00\`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+        if (queryDate < today) {
+          showMessage('只能查询今天及未来三天内的行程', 'error');
+          return;
+        }
+
+        if (queryDate > threeDaysLater) {
+          showMessage('只能查询三天内的行程', 'error');
+          return;
+        }
       }
 
       const requestData = { date: date };
