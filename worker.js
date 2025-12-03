@@ -3245,10 +3245,19 @@ async function handleMatch(request, env, ip) {
   // 两点一线匹配：使用智能匹配（距离 + 名称相似度）
   const matches = [];
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
 
   for (const trip of trips.results) {
-    // 过滤已过期的行程
-    if (trip.departure_timestamp < currentTime) {
+    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    let actualTimestamp = trip.departure_timestamp;
+    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
+    if (trip.departure_timestamp > fourHoursLater) {
+      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
+
+    // 过滤已过期的行程（使用修正后的时间戳）
+    if (actualTimestamp < currentTime) {
       continue;
     }
 
@@ -3528,11 +3537,20 @@ async function handleSearchByTime(request, env, ip) {
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
   const filteredTrips = [];
 
   for (const trip of trips.results) {
-    // 过滤已过期的行程
-    if (trip.departure_timestamp < currentTime) {
+    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    let actualTimestamp = trip.departure_timestamp;
+    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
+    if (trip.departure_timestamp > fourHoursLater) {
+      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
+
+    // 过滤已过期的行程（使用修正后的时间戳）
+    if (actualTimestamp < currentTime) {
       continue;
     }
 
@@ -3609,10 +3627,19 @@ async function handleSearchByRoute(request, env, ip) {
   // 距离筛选和数据处理
   const matchedTrips = [];
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
 
   for (const trip of allTrips.results) {
-    // 过滤已过期的行程
-    if (trip.departure_timestamp < currentTime) {
+    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    let actualTimestamp = trip.departure_timestamp;
+    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
+    if (trip.departure_timestamp > fourHoursLater) {
+      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
+
+    // 过滤已过期的行程（使用修正后的时间戳）
+    if (actualTimestamp < currentTime) {
       continue;
     }
 
