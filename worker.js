@@ -2791,29 +2791,42 @@ export default {
         return jsonResponse({ error: crawlerCheck.reason }, 403);
       }
 
-      // CSRF防护：检查POST请求的Origin和Referer
-      if (request.method === 'POST') {
+      // CSRF防护：检查POST请求的Origin和Referer（仅针对API路径）
+      if (request.method === 'POST' && url.pathname.startsWith('/api/')) {
         const origin = request.headers.get('Origin');
         const referer = request.headers.get('Referer');
         const host = request.headers.get('Host') || url.host;
 
-        // 如果有Origin头，必须匹配当前域名
-        if (origin) {
-          const originHost = new URL(origin).host;
-          if (originHost !== host) {
-            return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+        // 白名单IP跳过CSRF检查
+        if (!IP_WHITELIST.includes(ip)) {
+          // 如果有Origin头，必须匹配当前域名
+          if (origin) {
+            try {
+              const originHost = new URL(origin).host;
+              if (originHost !== host) {
+                return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+              }
+            } catch (e) {
+              // Origin格式错误，拒绝
+              return jsonResponse({ error: 'CSRF检测：Origin格式错误' }, 403);
+            }
           }
-        }
-        // 如果有Referer头，必须来自当前域名
-        else if (referer) {
-          const refererHost = new URL(referer).host;
-          if (refererHost !== host) {
-            return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+          // 如果有Referer头，必须来自当前域名
+          else if (referer) {
+            try {
+              const refererHost = new URL(referer).host;
+              if (refererHost !== host) {
+                return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+              }
+            } catch (e) {
+              // Referer格式错误，允许通过（某些浏览器不发送Referer）
+              console.log('Referer格式错误，允许通过:', e.message);
+            }
           }
-        }
-        // 如果都没有，拒绝请求（可能是直接调用API）
-        else {
-          return jsonResponse({ error: 'CSRF检测：缺少请求来源信息' }, 403);
+          // 如果都没有，记录日志但允许通过（某些浏览器隐私设置）
+          else {
+            console.log('缺少Origin/Referer，但允许通过（浏览器隐私设置）');
+          }
         }
       }
 
@@ -3045,8 +3058,9 @@ async function handleResolvePOI(request, env) {
 
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
-  const body = await request.json();
-  const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
+  try {
+    const body = await request.json();
+    const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
 
   // 验证必填字段
   if (!name || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
@@ -3261,6 +3275,15 @@ async function handleCreateTrip(request, env, ip) {
   await cleanupExpiredTrips(env);
 
   return jsonResponse({ success: true, id: result.meta.last_row_id });
+  } catch (error) {
+    console.error('创建行程失败:', error);
+    console.error('错误堆栈:', error.stack);
+    return jsonResponse({
+      error: '创建行程失败',
+      details: error.message,
+      stack: error.stack
+    }, 500);
+  }
 }
 
 // 匹配行程（仅限已发布行程的用户使用，返回联系方式）
