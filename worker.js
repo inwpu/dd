@@ -1033,6 +1033,10 @@ const INDEX_HTML = `<!DOCTYPE html>
         <button type="submit">查询该时段行程</button>
       </form>
 
+      <div class="tip" style="margin-top: 15px; font-size: 0.9em;">
+        <strong>提示：</strong>仅支持查询今天及未来3天内的行程数据
+      </div>
+
       <div id="timeQueryResult"></div>
     </div>
 
@@ -2582,6 +2586,17 @@ const STATS_HTML = `<!DOCTYPE html>
     // 使用当前域名，避免跨域问题
     const API_BASE = window.location.origin;
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
+
+    // HTML转义函数，防止XSS攻击
+    function escapeHtml(unsafe) {
+      if (typeof unsafe !== 'string') return '';
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
     // 网站运行时间计算
     function updateRuntime() {
