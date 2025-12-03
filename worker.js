@@ -3204,8 +3204,11 @@ async function handleMatch(request, env, ip) {
     }, 403);
   }
 
-  // 验证行程时间是否有效（未来7天内）
+  // 验证行程时间是否有效
   const now = Date.now();
+
+  // 直接使用原始时间戳判断，不进行修正
+  // 新数据已经使用了正确的北京时间，旧数据会在查询时被过滤
   if (userTrip.departure_timestamp < now) {
     return jsonResponse({ error: '您的行程已过期，无法进行匹配' }, 400);
   }
@@ -3236,7 +3239,7 @@ async function handleMatch(request, env, ip) {
 
   // 查询时间范围内的行程（排除自己的）
   const trips = await env.DB.prepare(`
-    SELECT * FROM trips
+    SELECT *, created_at FROM trips
     WHERE departure_timestamp BETWEEN ? AND ?
     AND id != ?
     ORDER BY departure_timestamp
@@ -3246,13 +3249,15 @@ async function handleMatch(request, env, ip) {
   const matches = [];
   const currentTime = Date.now();
   const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
+  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
 
   for (const trip of trips.results) {
-    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    // 修正旧数据的时间戳
+    // 判断：如果 created_at < fixCutoffTime，说明是旧数据，时间戳需要减去8小时
     let actualTimestamp = trip.departure_timestamp;
-    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
-    if (trip.departure_timestamp > fourHoursLater) {
-      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
       actualTimestamp = trip.departure_timestamp - beijingOffset;
     }
 
@@ -3529,7 +3534,7 @@ async function handleSearchByTime(request, env, ip) {
 
   // 查询该时间段内的行程
   const trips = await env.DB.prepare(`
-    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp
+    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, created_at
     FROM trips
     WHERE departure_timestamp BETWEEN ? AND ?
     ORDER BY departure_timestamp
@@ -3537,14 +3542,16 @@ async function handleSearchByTime(request, env, ip) {
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
+  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
   const filteredTrips = [];
 
   for (const trip of trips.results) {
-    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    // 修正旧数据的时间戳
     let actualTimestamp = trip.departure_timestamp;
-    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
-    if (trip.departure_timestamp > fourHoursLater) {
-      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
       actualTimestamp = trip.departure_timestamp - beijingOffset;
     }
 
@@ -3605,7 +3612,7 @@ async function handleSearchByRoute(request, env, ip) {
 
   // 构建查询
   let query = `
-    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon
+    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon, created_at
     FROM trips
     WHERE 1=1
   `;
@@ -3627,13 +3634,14 @@ async function handleSearchByRoute(request, env, ip) {
   const matchedTrips = [];
   const currentTime = Date.now();
   const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
+  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
 
   for (const trip of allTrips.results) {
-    // 修正旧数据的时间戳（如果时间戳异常大，说明是旧数据，需要减去8小时）
+    // 修正旧数据的时间戳
     let actualTimestamp = trip.departure_timestamp;
-    const fourHoursLater = currentTime + 4 * 60 * 60 * 1000;
-    if (trip.departure_timestamp > fourHoursLater) {
-      // 这是旧数据，被错误地当作UTC保存，需要减去8小时
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
       actualTimestamp = trip.departure_timestamp - beijingOffset;
     }
 
