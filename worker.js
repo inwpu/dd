@@ -2003,9 +2003,9 @@ const INDEX_HTML = `<!DOCTYPE html>
 
     function updateTimeQueryResult(message) {
       if (message) {
-        timeQueryResultContainer.innerHTML = `
-          <div class="tip">${escapeHtml(message)}</div>
-        `;
+        timeQueryResultContainer.innerHTML = \`
+          <div class="tip">\${escapeHtml(message)}</div>
+        \`;
       } else {
         timeQueryResultContainer.innerHTML = '';
       }
