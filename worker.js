@@ -1904,7 +1904,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             <div class="match-contact">
               联系方式：\${escapeHtml(match.contact)}
             </div>
-            <button class="confirm-match-btn" data-trip-id="\${escapeHtml(match.id)}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+            <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
               确认匹配
             </button>
           </div>
@@ -1918,8 +1918,14 @@ const INDEX_HTML = `<!DOCTYPE html>
       container.querySelectorAll('.confirm-match-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const matchedTripId = parseInt(e.target.dataset.tripId);
+
           if (!currentTripId) {
             showMessage('无法确认匹配，请重新发布行程', 'error');
+            return;
+          }
+
+          if (!matchedTripId || isNaN(matchedTripId)) {
+            showMessage('无效的行程ID', 'error');
             return;
           }
 
