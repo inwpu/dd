@@ -2694,7 +2694,7 @@ const MAX_REQUESTS_PER_MINUTE = 60;
 const BAN_DURATION = 24 * 60 * 60 * 1000; // 24小时
 const SEARCH_RATE_LIMIT = 2; // 每秒2次
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-const MAX_MATCH_PER_DAY = 5; // 每天最多匹配5次
+const MAX_MATCH_PER_DAY = 100; // 每天最多匹配5次
 const MIN_SEARCH_LENGTH = 2; // 最小搜索长度（字符）
 const MAX_QUERY_PER_MINUTE = 10; // 每分钟最多查询10次
 
