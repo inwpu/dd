@@ -3256,11 +3256,7 @@ async function handleMatch(request, env, ip) {
 
       const isMatched = !!matchRecord;
 
-      // 过滤已匹配的行程
-      if (isMatched) {
-        continue;
-      }
-
+      // 不过滤已匹配的行程，全部加入matches数组
       matches.push({
         id: trip.id,
         name: trip.name,
@@ -3276,11 +3272,15 @@ async function handleMatch(request, env, ip) {
     }
   }
 
+  // 如果有已匹配的行程，只返回已匹配的；否则返回所有未匹配的
+  const matchedTrips = matches.filter(m => m.is_matched);
+  const finalMatches = matchedTrips.length > 0 ? matchedTrips : matches;
+
   // 记录匹配次数
   await recordMatchAttempt(ip, today, env);
 
   return jsonResponse({
-    matches,
+    matches: finalMatches,
     your_trip: {
       id: userTrip.id,
       departure: userTrip.departure_location_name,
@@ -3498,17 +3498,25 @@ async function handleSearchByTime(request, env, ip) {
     return jsonResponse({ error: '时间格式错误' }, 400);
   }
 
-  // 查询该时间段内的行程
+  // 查询该时间段内的行程（需要考虑旧数据的时区偏移问题）
+  // 旧数据的 departure_timestamp 被错误保存（多加了8小时），所以需要查询时间+8小时的范围
+  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
+  const oldDataStartTimestamp = startTimestamp + beijingOffset;
+  const oldDataEndTimestamp = endTimestamp + beijingOffset;
+
   const trips = await env.DB.prepare(`
     SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, created_at
     FROM trips
-    WHERE departure_timestamp BETWEEN ? AND ?
+    WHERE (
+      (created_at >= ? AND departure_timestamp BETWEEN ? AND ?)
+      OR
+      (created_at < ? AND departure_timestamp BETWEEN ? AND ?)
+    )
     ORDER BY departure_timestamp
-  `).bind(startTimestamp, endTimestamp).all();
+  `).bind(fixCutoffTime, startTimestamp, endTimestamp, fixCutoffTime, oldDataStartTimestamp, oldDataEndTimestamp).all();
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
-  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
   const filteredTrips = [];
 
   for (const trip of trips.results) {
@@ -3522,6 +3530,11 @@ async function handleSearchByTime(request, env, ip) {
 
     // 过滤已过期的行程（使用修正后的时间戳）
     if (actualTimestamp < currentTime) {
+      continue;
+    }
+
+    // 检查查询的时间范围（使用修正后的时间戳）
+    if (actualTimestamp < startTimestamp || actualTimestamp > endTimestamp) {
       continue;
     }
 
