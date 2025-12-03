@@ -1121,7 +1121,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             <div class="qr-popup-inner">
               <div class="qr-popup-label">微信扫码赞赏</div>
               <div class="qr-image-wrapper">
-                <img src="/images/wechhat.jpg" alt="微信赞赏码" class="qr-image">
+                <img data-src="/images/wechat.jpg" alt="微信赞赏码" class="qr-image qr-lazy">
               </div>
             </div>
           </div>
@@ -1132,7 +1132,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             <div class="qr-popup-inner">
               <div class="qr-popup-label">支付宝扫码赞赏</div>
               <div class="qr-image-wrapper">
-                <img src="/images/alipay.jpg" alt="支付宝赞赏码" class="qr-image">
+                <img data-src="/images/alipay.jpg" alt="支付宝赞赏码" class="qr-image qr-lazy">
               </div>
             </div>
           </div>
@@ -1299,6 +1299,19 @@ const INDEX_HTML = `<!DOCTYPE html>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
     }
+
+    // 懒加载二维码图片
+    document.querySelectorAll('.qr-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const popup = button.nextElementSibling;
+        const img = popup.querySelector('.qr-lazy');
+        if (img && img.dataset.src) {
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+          img.classList.remove('qr-lazy');
+        }
+      });
+    });
 
     let selectedDeparture = null;
     let selectedDestination = null;
@@ -1863,7 +1876,7 @@ const INDEX_HTML = `<!DOCTYPE html>
                 <div>目的地：\${escapeHtml(match.destination_location_name)}</div>
                 <div>出发时间：\${escapeHtml(match.departure_date)} \${escapeHtml(match.departure_time)}</div>
               </div>
-              <div class="match-contact" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+              <div class="match-contact" style="display: inline-block; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 6px; padding: 8px 16px; margin-top: 12px;">
                 <strong>联系方式：\${escapeHtml(match.contact)}</strong>
               </div>
             </div>
@@ -2795,7 +2808,7 @@ export default {
         return handleMyTrips(request, env, ip);
       } else if (url.pathname === '/api/cleanup') {
         return handleCleanup(env);
-      } else if (url.pathname === '/images/wechhat.jpg') {
+      } else if (url.pathname === '/images/wechat.jpg') {
         return handleImage('wechat');
       } else if (url.pathname === '/images/alipay.jpg') {
         return handleImage('alipay');
@@ -3419,11 +3432,16 @@ async function handleStats(env) {
       ORDER BY last_visit DESC
     `).all();
 
-    return jsonResponse({
+    const response = jsonResponse({
       totalVisitors: totalVisitors?.total || 0,
       totalPageViews: totalPageViews?.total || 0,
       topLocations: topLocations?.results || []
     });
+
+    // 添加缓存头，减少数据库查询
+    response.headers.set('Cache-Control', 'public, max-age=60'); // 缓存60秒
+
+    return response;
   } catch (error) {
     console.error('获取访客统计失败:', error);
     return jsonResponse({
