@@ -3144,13 +3144,14 @@ async function handleCreateTrip(request, env, ip) {
   }
 
   // 检查设备指纹高频（如果提供了设备指纹，检查1小时内最多5次）
-  if (device_fingerprint) {
+  if (device_fingerprint && typeof device_fingerprint === 'string' && device_fingerprint.length > 15) {
     const oneHourAgo = now - 60 * 60 * 1000;
+    const fingerprintPart = device_fingerprint.substring(3, 15);
     const fingerprintCount = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM trips WHERE user_id LIKE ? AND created_at > ?'
-    ).bind('%' + device_fingerprint.substring(3, 15) + '%', oneHourAgo).first();
+    ).bind('%' + fingerprintPart + '%', oneHourAgo).first();
 
-    if (fingerprintCount.count >= 5) {
+    if (fingerprintCount && fingerprintCount.count >= 5) {
       return jsonResponse({
         error: '检测到异常发单行为，请稍后再试',
         hint: '同一设备1小时内最多发布5次行程'
@@ -3957,29 +3958,9 @@ async function cleanupExpiredTrips(env) {
   const now = Date.now();
   const beijingOffset = 8 * 60 * 60 * 1000; // 8小时的毫秒数
 
-  // 先修正旧数据的时区问题（一次性修复）
-  // 旧数据被错误地当作UTC时间保存，需要减去8小时转换为正确的北京时间时间戳
-  // 检测条件：departure_timestamp - now > 4小时，说明这可能是被错误保存的数据
-  // 我们只修正今天到未来7天内的数据，避免影响太久远的数据
-  const fourHoursInMs = 4 * 60 * 60 * 1000;
-  const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
-
-  // 获取需要修正的数据数量
-  const needFixCount = await env.DB.prepare(`
-    SELECT COUNT(*) as count FROM trips
-    WHERE departure_timestamp - ? > ?
-    AND departure_timestamp < ?
-  `).bind(now, fourHoursInMs, sevenDaysLater).first();
-
-  if (needFixCount && needFixCount.count > 0) {
-    console.log(`修正 ${needFixCount.count} 条旧数据的时区...`);
-    await env.DB.prepare(`
-      UPDATE trips
-      SET departure_timestamp = departure_timestamp - ?
-      WHERE departure_timestamp - ? > ?
-      AND departure_timestamp < ?
-    `).bind(beijingOffset, now, fourHoursInMs, sevenDaysLater).run();
-  }
+  // 时区修正逻辑已移除
+  // fixCutoffTime (2025-12-03 00:00) 之前创建的旧数据会在查询时动态修正
+  // 不再自动修改数据库中的timestamp，避免影响新数据
 
   // 清理过期行程（出发时间超过7天的订单）
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
