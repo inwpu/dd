@@ -1811,6 +1811,8 @@ const INDEX_HTML = `<!DOCTYPE html>
       document.getElementById('loading').style.display = 'block';
       document.getElementById('matches').innerHTML = '';
 
+      updateTimeQueryResult('正在查询，请稍候...');
+
       try {
         // 创建行程
         const createResponse = await fetch(\`\${API_BASE}/api/create-trip\`, {
@@ -1997,9 +1999,22 @@ const INDEX_HTML = `<!DOCTYPE html>
       }, 5000);
     }
 
+    const timeQueryResultContainer = document.getElementById('timeQueryResult');
+
+    function updateTimeQueryResult(message) {
+      if (message) {
+        timeQueryResultContainer.innerHTML = `
+          <div class="tip">${escapeHtml(message)}</div>
+        `;
+      } else {
+        timeQueryResultContainer.innerHTML = '';
+      }
+    }
+
     // 按时间查询
     document.getElementById('timeQueryForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      updateTimeQueryResult('');
 
       // 组装日期和时间
       const year = document.getElementById('queryYear').value;
@@ -2011,7 +2026,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       const endMinute = document.getElementById('queryEndMinute').value;
 
       if (!year || !month || !day || !startHour || !startMinute || !endHour || !endMinute) {
-        showMessage('请完整填写查询日期和时间范围', 'error');
+        const msg = '请完整填写查询日期和时间范围';
+        showMessage(msg, 'error');
+        updateTimeQueryResult(msg);
         return;
       }
 
@@ -2029,12 +2046,16 @@ const INDEX_HTML = `<!DOCTYPE html>
       const threeDaysLater = new Date(beijingToday.getTime() + 3 * 24 * 60 * 60 * 1000);
 
       if (queryDate < today) {
-        showMessage('只能查询今天及未来三天内的行程', 'error');
+        const msg = '只能查询今天及未来三天内的行程';
+        showMessage(msg, 'error');
+        updateTimeQueryResult(msg);
         return;
       }
 
       if (queryDate > threeDaysLater) {
-        showMessage('只能查询三天内的行程', 'error');
+        const msg = '只能查询三天内的行程';
+        showMessage(msg, 'error');
+        updateTimeQueryResult(msg);
         return;
       }
 
@@ -2043,14 +2064,18 @@ const INDEX_HTML = `<!DOCTYPE html>
         const data = await response.json();
 
         if (!response.ok) {
-          showMessage(data.error || '查询失败', 'error');
+          const msg = data.error || '查询失败';
+          showMessage(msg, 'error');
+          updateTimeQueryResult(msg);
           return;
         }
 
         displayTimeQueryResult(data);
       } catch (error) {
         console.error('查询失败:', error);
-        showMessage('网络错误，请稍后重试', 'error');
+        const msg = '网络错误，请稍后重试';
+        showMessage(msg, 'error');
+        updateTimeQueryResult(msg);
       }
     });
 
