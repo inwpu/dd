@@ -900,22 +900,6 @@ const INDEX_HTML = `<!DOCTYPE html>
       </div>
 
       <div class="form-group">
-        <label>学校 & 校区 *</label>
-        <div class="school-row">
-          <div style="position: relative;">
-            <input type="text" id="school" required placeholder="请选择或输入学校" autocomplete="off">
-            <div id="schoolSuggestions" class="suggestions" style="display: none;"></div>
-          </div>
-          <input type="text" id="campus" placeholder="所在校区（如：长安校区）">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="college">学院（可选）</label>
-        <input type="text" id="college" placeholder="请输入学院名称">
-      </div>
-
-      <div class="form-group">
         <label>出发日期 *</label>
         <div class="datetime-picker">
           <select id="departureYear" required>
@@ -983,9 +967,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       <div class="tip">
         <strong style="color: #d9534f;"> 防刷单规则：</strong>
         <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
-          <li>5分钟内最多发布3次行程</li>
           <li>同一手机号1小时内最多发布2次</li>
-          <li>同一天、同地点、同时段最多发布5次</li>
           <li>严禁使用脚本刷单，一经发现IP封禁24小时，手机号封禁7天（到期自动解封）</li>
         </ul>
         <p style="margin-top: 10px;">提示：匹配成功后建议优先电话联系，方便快速沟通。</p>
@@ -1302,44 +1284,21 @@ const INDEX_HTML = `<!DOCTYPE html>
       "西安交通职业大学"
     ];
 
+    // HTML转义函数，防止XSS攻击
+    function escapeHtml(unsafe) {
+      if (typeof unsafe !== 'string') return '';
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     let selectedDeparture = null;
     let selectedDestination = null;
     let debounceTimerDeparture = null;
     let debounceTimerDestination = null;
-
-    // 学校输入提示
-    const schoolInput = document.getElementById('school');
-    const schoolSuggestions = document.getElementById('schoolSuggestions');
-
-    schoolInput.addEventListener('input', (e) => {
-      const value = e.target.value.trim();
-      if (!value) {
-        schoolSuggestions.style.display = 'none';
-        return;
-      }
-
-      const matches = SCHOOLS.filter(school => school.includes(value));
-      if (matches.length > 0) {
-        window.currentSchoolMatches = matches;
-        schoolSuggestions.innerHTML = matches.map((school, index) =>
-          \`<div class="suggestion-item" data-school-index="\${index}">\${school}</div>\`
-        ).join('');
-        schoolSuggestions.style.display = 'block';
-
-        // 使用事件委托绑定点击事件
-        setTimeout(() => {
-          const items = schoolSuggestions.querySelectorAll('.suggestion-item');
-          items.forEach((item, index) => {
-            item.onclick = () => {
-              schoolInput.value = window.currentSchoolMatches[index];
-              schoolSuggestions.style.display = 'none';
-            };
-          });
-        }, 10);
-      } else {
-        schoolSuggestions.style.display = 'none';
-      }
-    });
 
     // 出发地点搜索
     const departureInput = document.getElementById('departure');
@@ -1362,7 +1321,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('出发地搜索结果:', data);
 
           if (!response.ok) {
-            departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${data.error || '服务异常'}</div>\`;
+            departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${escapeHtml(data.error || '服务异常')}</div>\`;
             departureSuggestions.style.display = 'block';
             return;
           }
@@ -1372,7 +1331,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             window.currentDepartureTips = data.tips;
 
             departureSuggestions.innerHTML = data.tips.map((tip, index) =>
-              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${escapeHtml(tip.name)}<br><small style="color:#888">\${escapeHtml(tip.district || '')} \${escapeHtml(tip.address || '')}</small></div>\`
             ).join('');
             departureSuggestions.style.display = 'block';
 
@@ -1389,7 +1348,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
         } catch (error) {
           console.error('搜索失败:', error, error.stack);
-          departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
+          departureSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${escapeHtml(error.message)}</div>\`;
           departureSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1443,7 +1402,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           console.log('目的地搜索结果:', data);
 
           if (!response.ok) {
-            destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${data.error || '服务异常'}</div>\`;
+            destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">搜索错误：\${escapeHtml(data.error || '服务异常')}</div>\`;
             destinationSuggestions.style.display = 'block';
             return;
           }
@@ -1453,7 +1412,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             window.currentDestinationTips = data.tips;
 
             destinationSuggestions.innerHTML = data.tips.map((tip, index) =>
-              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${escapeHtml(tip.name)}<br><small style="color:#888">\${escapeHtml(tip.district || '')} \${escapeHtml(tip.address || '')}</small></div>\`
             ).join('');
             destinationSuggestions.style.display = 'block';
 
@@ -1470,7 +1429,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
         } catch (error) {
           console.error('搜索失败:', error, error.stack);
-          destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
+          destinationSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${escapeHtml(error.message)}</div>\`;
           destinationSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1534,7 +1493,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             window.currentRouteStartTips = data.tips;
 
             routeStartSuggestions.innerHTML = data.tips.map((tip, index) =>
-              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${escapeHtml(tip.name)}<br><small style="color:#888">\${escapeHtml(tip.district || '')} \${escapeHtml(tip.address || '')}</small></div>\`
             ).join('');
             routeStartSuggestions.style.display = 'block';
 
@@ -1551,7 +1510,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
         } catch (error) {
           console.error('搜索失败:', error, error.stack);
-          routeStartSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
+          routeStartSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${escapeHtml(error.message)}</div>\`;
           routeStartSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1609,7 +1568,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             window.currentRouteEndTips = data.tips;
 
             routeEndSuggestions.innerHTML = data.tips.map((tip, index) =>
-              \`<div class="suggestion-item" data-tip-index="\${index}">\${tip.name}<br><small style="color:#888">\${tip.district || ''} \${tip.address || ''}</small></div>\`
+              \`<div class="suggestion-item" data-tip-index="\${index}">\${escapeHtml(tip.name)}<br><small style="color:#888">\${escapeHtml(tip.district || '')} \${escapeHtml(tip.address || '')}</small></div>\`
             ).join('');
             routeEndSuggestions.style.display = 'block';
 
@@ -1626,7 +1585,7 @@ const INDEX_HTML = `<!DOCTYPE html>
           }
         } catch (error) {
           console.error('搜索失败:', error, error.stack);
-          routeEndSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${error.message}</div>\`;
+          routeEndSuggestions.innerHTML = \`<div class="suggestion-item" style="color:#d32f2f;cursor:default;">网络错误：\${escapeHtml(error.message)}</div>\`;
           routeEndSuggestions.style.display = 'block';
         }
       }, 400);
@@ -1814,9 +1773,6 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       const formData = {
         name: document.getElementById('name').value.trim(),
-        school: document.getElementById('school').value.trim(),
-        campus: document.getElementById('campus').value.trim(),
-        college: document.getElementById('college').value.trim(),
         departure_lat: selectedDeparture.lat,
         departure_lon: selectedDeparture.lon,
         departure_location_name: selectedDeparture.name,
@@ -1897,18 +1853,16 @@ const INDEX_HTML = `<!DOCTYPE html>
           \${matchedTrips.map(match => \`
             <div class="match-card" style="border: 2px solid #28a745;">
               <div class="match-header">
-                <span class="match-name">\${match.name}</span>
-                <span class="match-distance">出发地 \${match.departure_distance}km · 目的地 \${match.destination_distance}km</span>
+                <span class="match-name">\${escapeHtml(match.name)}</span>
+                <span class="match-distance">出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
               </div>
               <div class="match-info">
-                <div>学校：\${match.school} \${match.campus ? '· ' + match.campus : ''}</div>
-                \${match.college ? \`<div>学院：\${match.college}</div>\` : ''}
-                <div>出发地：\${match.departure_location_name}</div>
-                <div>目的地：\${match.destination_location_name}</div>
-                <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
+                <div>出发地：\${escapeHtml(match.departure_location_name)}</div>
+                <div>目的地：\${escapeHtml(match.destination_location_name)}</div>
+                <div>出发时间：\${escapeHtml(match.departure_date)} \${escapeHtml(match.departure_time)}</div>
               </div>
               <div class="match-contact" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
-                <strong>联系方式：\${match.contact}</strong>
+                <strong>联系方式：\${escapeHtml(match.contact)}</strong>
               </div>
             </div>
           \`).join('')}
@@ -1924,7 +1878,7 @@ const INDEX_HTML = `<!DOCTYPE html>
         container.innerHTML = \`
           <div class="tip">
             暂无匹配的拼车信息，您的行程已发布，其他用户可以找到您！
-            \${yourTrip ? \`<p style="margin-top: 10px;">您的行程：\${yourTrip.departure} → \${yourTrip.destination} - \${yourTrip.time}</p>\` : ''}
+            \${yourTrip ? \`<p style="margin-top: 10px;">您的行程：\${escapeHtml(yourTrip.departure)} → \${escapeHtml(yourTrip.destination)} - \${escapeHtml(yourTrip.time)}</p>\` : ''}
           </div>
         \`;
         return;
@@ -1937,20 +1891,18 @@ const INDEX_HTML = `<!DOCTYPE html>
         \${unmatchedTrips.map(match => \`
           <div class="match-card">
             <div class="match-header">
-              <span class="match-name">\${match.name}</span>
-              <span class="match-distance">出发地 \${match.departure_distance}km · 目的地 \${match.destination_distance}km</span>
+              <span class="match-name">\${escapeHtml(match.name)}</span>
+              <span class="match-distance">出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
             </div>
             <div class="match-info">
-              <div>学校：\${match.school} \${match.campus ? '· ' + match.campus : ''}</div>
-              \${match.college ? \`<div>学院：\${match.college}</div>\` : ''}
-              <div>出发地：\${match.departure_location_name}</div>
-              <div>目的地：\${match.destination_location_name}</div>
-              <div>出发时间：\${match.departure_date} \${match.departure_time}</div>
+              <div>出发地：\${escapeHtml(match.departure_location_name)}</div>
+              <div>目的地：\${escapeHtml(match.destination_location_name)}</div>
+              <div>出发时间：\${escapeHtml(match.departure_date)} \${escapeHtml(match.departure_time)}</div>
             </div>
             <div class="match-contact">
-              联系方式：\${match.contact}
+              联系方式：\${escapeHtml(match.contact)}
             </div>
-            <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+            <button class="confirm-match-btn" data-trip-id="\${escapeHtml(match.id)}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
               确认匹配
             </button>
           </div>
@@ -2076,20 +2028,16 @@ const INDEX_HTML = `<!DOCTYPE html>
       const container = document.getElementById('timeQueryResult');
 
       if (!data || data.total === 0) {
-        container.innerHTML = '<div class="tip">该时段暂无行程信息</div>';
+        const timeInfo = data?.time_range ? \`\${escapeHtml(data.time_range.start)} 至 \${escapeHtml(data.time_range.end)}\` : '该时段';
+        container.innerHTML = \`<div class="tip">\${timeInfo}暂无行程信息</div>\`;
         return;
       }
 
-      const schoolList = data.school_distribution ? Object.entries(data.school_distribution)
-        .map(([school, count]) => \`<li>\${school}: \${count} 人</li>\`)
-        .join('') : '';
-
       const tripsList = (data.trips && data.trips.length > 0) ? data.trips.map(trip => \`
         <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
-          <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
-          <div>出发地：\${trip.departure}</div>
-          <div>目的地：\${trip.destination}</div>
-          <div>出发时间：\${trip.departure_time}</div>
+          <div>出发地：\${escapeHtml(trip.departure)}</div>
+          <div>目的地：\${escapeHtml(trip.destination)}</div>
+          <div>出发时间：\${escapeHtml(trip.departure_time)}</div>
         </div>
       \`).join('') : '<div class="tip">暂无行程数据</div>';
 
@@ -2102,13 +2050,6 @@ const INDEX_HTML = `<!DOCTYPE html>
               <div class="stat-box-value">\${data.total}</div>
               <div class="stat-box-label">总行程数</div>
             </div>
-          </div>
-
-          <div style="margin-top: 20px;">
-            <h4 style="color: #8b4513; margin-bottom: 10px;">学校分布</h4>
-            <ul style="line-height: 2; color: #5d4037;">
-              \${schoolList}
-            </ul>
           </div>
 
           <div style="margin-top: 20px;">
@@ -2187,7 +2128,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       const container = document.getElementById('routeQueryResult');
 
       if (!data || data.total === 0) {
-        container.innerHTML = '<div class="tip">该路线暂无行程信息</div>';
+        const routeInfo = data?.route ? \`路线 \${escapeHtml(data.route.start)} → \${escapeHtml(data.route.end)}\` : '该路线';
+        const dateInfo = data?.date && data.date !== '所有日期' ? \` (\${escapeHtml(data.date)})\` : '';
+        container.innerHTML = \`<div class="tip">\${routeInfo}\${dateInfo} 暂无行程信息</div>\`;
         return;
       }
 
@@ -2195,8 +2138,8 @@ const INDEX_HTML = `<!DOCTYPE html>
         .filter(([_, count]) => count > 0)
         .map(([time, count]) => \`
           <div class="stat-box">
-            <div class="stat-box-value">\${count}</div>
-            <div class="stat-box-label">\${time}</div>
+            <div class="stat-box-value">\${escapeHtml(String(count))}</div>
+            <div class="stat-box-label">\${escapeHtml(time)}</div>
           </div>
         \`).join('') : '';
 
@@ -2204,17 +2147,16 @@ const INDEX_HTML = `<!DOCTYPE html>
         let distanceInfo = '';
         if (trip.departure_distance || trip.destination_distance) {
           const parts = [];
-          if (trip.departure_distance) parts.push(\`出发地距离 \${trip.departure_distance}km\`);
-          if (trip.destination_distance) parts.push(\`目的地距离 \${trip.destination_distance}km\`);
+          if (trip.departure_distance) parts.push(\`出发地距离 \${escapeHtml(String(trip.departure_distance))}km\`);
+          if (trip.destination_distance) parts.push(\`目的地距离 \${escapeHtml(String(trip.destination_distance))}km\`);
           distanceInfo = \`<div style="color: #daa520; font-size: 0.9em; margin-top: 5px;">\${parts.join(' · ')}</div>\`;
         }
 
         return \`
           <div style="padding: 10px; background: white; margin-bottom: 8px; border-radius: 4px; border: 1px solid #e0d0b0;">
-            <div><strong>\${trip.school}</strong> \${trip.campus || ''}</div>
-            <div>出发地：\${trip.departure}</div>
-            <div>目的地：\${trip.destination}</div>
-            <div>出发时间：\${trip.departure_time}</div>
+            <div>出发地：\${escapeHtml(trip.departure)}</div>
+            <div>目的地：\${escapeHtml(trip.destination)}</div>
+            <div>出发时间：\${escapeHtml(trip.departure_time)}</div>
             \${distanceInfo}
           </div>
         \`;
@@ -2222,9 +2164,9 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       const routeInfo = data.route ? \`
         <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c9a66b;">
-          <div><strong>路线：</strong>\${data.route.start} → \${data.route.end}</div>
-          <div style="margin-top: 8px;"><strong>日期：</strong>\${data.date || '不限'}</div>
-          <div style="margin-top: 8px; color: #8b4513; font-size: 1.1em;">\${data.summary || ''}</div>
+          <div><strong>路线：</strong>\${escapeHtml(data.route.start)} → \${escapeHtml(data.route.end)}</div>
+          <div style="margin-top: 8px;"><strong>日期：</strong>\${escapeHtml(data.date || '不限')}</div>
+          <div style="margin-top: 8px; color: #8b4513; font-size: 1.1em;">\${escapeHtml(data.summary || '')}</div>
         </div>
       \` : '';
 
@@ -2300,7 +2242,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       if (!data || data.total === 0) {
         container.innerHTML = \`
           <div class="tip">
-            \${data.message || '暂无订单记录'}
+            \${escapeHtml(data.message || '暂无订单记录')}
           </div>
         \`;
         return;
@@ -2308,37 +2250,37 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       container.innerHTML = \`
         <div class="query-result">
-          <h3 style="color: #8b4513; margin-bottom: 15px;">我的订单（共 \${data.total} 条）</h3>
+          <h3 style="color: #8b4513; margin-bottom: 15px;">我的订单（共 \${escapeHtml(String(data.total))} 条）</h3>
 
           \${data.trips.map(trip => \`
             <div style="padding: 15px; background: white; margin-bottom: 12px; border-radius: 6px; border: 1px solid #c9a66b; \${trip.is_expired ? 'opacity: 0.7;' : ''}">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="font-weight: bold; color: #8b4513;">订单 #\${trip.id}</div>
+                <div style="font-weight: bold; color: #8b4513;">订单 #\${escapeHtml(String(trip.id))}</div>
                 <div style="font-size: 0.9em; color: \${trip.is_expired ? '#999' : '#28a745'};">
                   \${trip.is_expired ? '已过期' : '进行中'}
                 </div>
               </div>
 
               <div style="margin-bottom: 8px;">
-                <strong>\${trip.name}</strong> · \${trip.school} \${trip.campus || ''}
+                <strong>\${escapeHtml(trip.name)}</strong>
               </div>
 
               <div style="color: #666; margin-bottom: 5px;">
-                出发地：\${trip.departure}
+                出发地：\${escapeHtml(trip.departure)}
               </div>
               <div style="color: #666; margin-bottom: 5px;">
-                目的地：\${trip.destination}
+                目的地：\${escapeHtml(trip.destination)}
               </div>
               <div style="color: #666; margin-bottom: 5px;">
-                出发时间：\${trip.departure_date} \${trip.departure_time}
+                出发时间：\${escapeHtml(trip.departure_date)} \${escapeHtml(trip.departure_time)}
               </div>
               <div style="color: #666; margin-bottom: 5px;">
-                联系方式：\${trip.contact}
+                联系方式：\${escapeHtml(trip.contact)}
               </div>
 
               <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0d0b0;">
                 <span style="color: #8b4513;">
-                  匹配状态：\${trip.match_count > 0 ? \`已确认 \${trip.match_count} 个匹配\` : '暂无匹配'}
+                  匹配状态：\${trip.match_count > 0 ? \`已确认 \${escapeHtml(String(trip.match_count))} 个匹配\` : '暂无匹配'}
                 </span>
               </div>
             </div>
@@ -2682,10 +2624,10 @@ const STATS_HTML = `<!DOCTYPE html>
 
           return \`
             <tr>
-              <td class="rank">\${num}</td>
-              <td>\${item.ip}</td>
-              <td>\${location}</td>
-              <td style="text-align: center; font-weight: bold; color: #8b4513;">\${item.count || 0}</td>
+              <td class="rank">\${escapeHtml(String(num))}</td>
+              <td>\${escapeHtml(item.ip)}</td>
+              <td>\${escapeHtml(location)}</td>
+              <td style="text-align: center; font-weight: bold; color: #8b4513;">\${escapeHtml(String(item.count || 0))}</td>
             </tr>
           \`;
         }).join('');
@@ -2735,6 +2677,11 @@ const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 const MAX_MATCH_PER_DAY = 5; // 每天最多匹配5次
 const MIN_SEARCH_LENGTH = 2; // 最小搜索长度（字符）
 const MAX_QUERY_PER_MINUTE = 10; // 每分钟最多查询10次
+
+// IP白名单（测试用，不会被封禁）
+const IP_WHITELIST = [
+  '58.211.134.78'
+];
 
 // 爬虫UA黑名单
 const CRAWLER_PATTERNS = [
@@ -2813,11 +2760,19 @@ export default {
       } else if (url.pathname.startsWith('/api/discussions')) {
         // 代理 Giscus API 请求
         const giscusUrl = `https://giscus.app${url.pathname}${url.search}`;
-        return fetch(giscusUrl, {
+        const giscusResponse = await fetch(giscusUrl, {
           method: request.method,
           headers: request.headers,
           body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined
         });
+
+        // 修改响应头以允许跨域访问
+        const response = new Response(giscusResponse.body, giscusResponse);
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+
+        return response;
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
@@ -2849,6 +2804,11 @@ function cleanupAccessLog() {
 
 // 反爬虫检查
 async function checkCrawler(ua, ip, env) {
+  // 白名单IP跳过所有检查
+  if (IP_WHITELIST.includes(ip)) {
+    return { allowed: true };
+  }
+
   // UA检查
   const lowerUA = ua.toLowerCase();
   for (const pattern of CRAWLER_PATTERNS) {
@@ -2972,10 +2932,10 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id } = body;
+  const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id } = body;
 
   // 验证必填字段
-  if (!name || !school || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
+  if (!name || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
   }
 
@@ -3078,8 +3038,8 @@ async function handleCreateTrip(request, env, ip) {
     'SELECT COUNT(*) as count FROM trips WHERE ip = ? AND created_at > ?'
   ).bind(ip, oneDayAgo).first();
 
-  if (ipTripCount.count >= 20) {
-    // 临时封禁24小时
+  if (ipTripCount.count >= 20 && !IP_WHITELIST.includes(ip)) {
+    // 临时封禁24小时（白名单IP除外）
     await env.DB.prepare(`
       INSERT INTO ip_bans (ip, banned_until, reason)
       VALUES (?, ?, ?)
@@ -3103,8 +3063,8 @@ async function handleCreateTrip(request, env, ip) {
 
   // 检测机器人行为特征（姓名包含"测试"、"test"等）
   const suspiciousPatterns = /测试|test|bot|script|批量|刷单|垃圾|假|虚假/i;
-  if (suspiciousPatterns.test(name) || suspiciousPatterns.test(school)) {
-    // 封禁IP
+  if (suspiciousPatterns.test(name) && !IP_WHITELIST.includes(ip)) {
+    // 封禁IP（白名单IP除外）
     await env.DB.prepare(`
       INSERT INTO ip_bans (ip, banned_until, reason)
       VALUES (?, ?, ?)
@@ -3145,9 +3105,9 @@ async function handleCreateTrip(request, env, ip) {
 
   // 插入数据库（包含出发地和目的地、user_key、user_id）
   const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(name, school, campus || '', college || '', departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, user_key, user_id, now).run();
+    INSERT INTO trips (name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, user_key, user_id, now).run();
 
   // 更新发单频率计数
   await env.DB.prepare(`
@@ -3256,14 +3216,11 @@ async function handleMatch(request, env, ip) {
       matches.push({
         id: trip.id,
         name: trip.name,
-        school: trip.school,
-        campus: trip.campus,
-        college: trip.college,
         departure_location_name: trip.departure_location_name,
         destination_location_name: trip.destination_location_name,
         departure_date: trip.departure_date,
         departure_time: trip.departure_time,
-        contact: isMatched ? null : trip.contact, // 已匹配则不显示联系方式
+        contact: trip.contact, // 始终返回联系方式
         departure_distance: departureDistance.toFixed(2),
         destination_distance: destinationDistance.toFixed(2),
         is_matched: isMatched
@@ -3350,7 +3307,7 @@ async function handleMyTrips(request, env, ip) {
   // 查询7天内的订单（双因子验证）
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const trips = await env.DB.prepare(`
-    SELECT id, name, school, campus, college, departure_location_name, destination_location_name,
+    SELECT id, name, departure_location_name, destination_location_name,
            departure_date, departure_time, departure_timestamp, contact, created_at
     FROM trips
     WHERE user_key = ? AND user_id = ? AND created_at > ?
@@ -3384,9 +3341,6 @@ async function handleMyTrips(request, env, ip) {
     return {
       id: trip.id,
       name: trip.name,
-      school: trip.school,
-      campus: trip.campus,
-      college: trip.college,
       departure: trip.departure_location_name,
       destination: trip.destination_location_name,
       departure_date: trip.departure_date,
@@ -3420,7 +3374,6 @@ async function handleStats(env) {
     SELECT ip, country, city, count
     FROM visitors
     ORDER BY last_visit DESC
-    LIMIT 50
   `).all();
 
   return jsonResponse({
@@ -3480,18 +3433,11 @@ async function handleSearchByTime(request, env, ip) {
 
   // 查询该时间段内的行程
   const trips = await env.DB.prepare(`
-    SELECT id, school, campus, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp
+    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp
     FROM trips
     WHERE departure_timestamp BETWEEN ? AND ?
     ORDER BY departure_timestamp
   `).bind(startTimestamp, endTimestamp).all();
-
-  // 统计信息
-  const schoolStats = {};
-  trips.results.forEach(trip => {
-    const schoolKey = trip.campus ? `${trip.school} ${trip.campus}` : trip.school;
-    schoolStats[schoolKey] = (schoolStats[schoolKey] || 0) + 1;
-  });
 
   return jsonResponse({
     total: trips.results.length,
@@ -3499,10 +3445,7 @@ async function handleSearchByTime(request, env, ip) {
       start: `${date} ${startTime}`,
       end: `${date} ${endTime}`
     },
-    school_distribution: schoolStats,
     trips: trips.results.map(t => ({
-      school: t.school,
-      campus: t.campus,
       departure: t.departure_location_name,
       destination: t.destination_location_name,
       departure_time: `${t.departure_date} ${t.departure_time}`
@@ -3535,7 +3478,7 @@ async function handleSearchByRoute(request, env, ip) {
 
   // 构建查询
   let query = `
-    SELECT id, school, campus, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon
+    SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, departure_lat, departure_lon, destination_lat, destination_lon
     FROM trips
     WHERE 1=1
   `;
@@ -3635,8 +3578,6 @@ async function handleSearchByRoute(request, env, ip) {
     date: date || '所有日期',
     time_distribution: timeSlots,
     trips: matchedTrips.map(t => ({
-      school: t.school,
-      campus: t.campus,
       departure: t.departure_location_name,
       destination: t.destination_location_name,
       departure_time: `${t.departure_date} ${t.departure_time}`,
