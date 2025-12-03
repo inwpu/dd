@@ -3309,14 +3309,15 @@ async function handleCreateTrip(request, env, ip) {
   }
 
   // 插入数据库（包含出发地和目的地、user_key、user_id）
-  const result = await env.DB.prepare(`
-    INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
+  const tripColumns = await getTripColumns(env);
+  const hasSchoolColumns = tripColumns.includes('school') && tripColumns.includes('campus') && tripColumns.includes('college');
+
+  let insertSql = `
+    INSERT INTO trips (name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  let insertParams = [
     name,
-    normalizedSchool,
-    normalizedCampus,
-    normalizedCollege,
     departure_lat,
     departure_lon,
     departure_location_name,
@@ -3332,7 +3333,37 @@ async function handleCreateTrip(request, env, ip) {
     user_key,
     user_id,
     now
-  ).run();
+  ];
+
+  if (hasSchoolColumns) {
+    insertSql = `
+      INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    insertParams = [
+      name,
+      normalizedSchool,
+      normalizedCampus,
+      normalizedCollege,
+      departure_lat,
+      departure_lon,
+      departure_location_name,
+      destination_lat,
+      destination_lon,
+      destination_location_name,
+      departure_date,
+      departure_time,
+      departureTimestamp,
+      contact,
+      timeRangeValue,
+      ip,
+      user_key,
+      user_id,
+      now
+    ];
+  }
+
+  const result = await env.DB.prepare(insertSql).bind(...insertParams).run();
 
   // 更新发单频率计数
   await env.DB.prepare(`
@@ -4083,6 +4114,30 @@ async function cleanupExpiredTrips(env) {
     matchLimits: matchLimitsResult.meta.changes,
     queryLimits: queryLimitsResult.meta.changes
   };
+}
+
+let tripColumnsCache = null;
+let lastTripColumnsFetch = 0;
+const TRIP_COLUMNS_CACHE_TTL = 5 * 60 * 1000;
+
+async function getTripColumns(env) {
+  const now = Date.now();
+  if (tripColumnsCache && (now - lastTripColumnsFetch) < TRIP_COLUMNS_CACHE_TTL) {
+    return tripColumnsCache;
+  }
+
+  try {
+    const pragmaResult = await env.DB.prepare('PRAGMA table_info(trips)').all();
+    if (pragmaResult && Array.isArray(pragmaResult.results)) {
+      tripColumnsCache = pragmaResult.results.map(col => col.name);
+      lastTripColumnsFetch = now;
+      return tripColumnsCache;
+    }
+  } catch (error) {
+    console.error('获取trips表结构失败:', error);
+  }
+
+  return tripColumnsCache || [];
 }
 
 function getActualDepartureTimestamp(trip) {
