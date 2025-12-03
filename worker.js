@@ -2639,8 +2639,13 @@ const STATS_HTML = `<!DOCTYPE html>
         console.error('加载统计失败:', error);
         document.getElementById('loading').style.display = 'none';
         const errorDiv = document.getElementById('error');
-        errorDiv.textContent = '加载统计数据失败，请稍后重试';
+        errorDiv.textContent = '加载统计数据失败，请稍后重试。错误: ' + error.message;
         errorDiv.style.display = 'block';
+
+        // 显示空数据而不是什么都不显示
+        document.getElementById('totalVisitors').textContent = '0';
+        document.getElementById('totalPageViews').textContent = '0';
+        document.getElementById('statsContent').style.display = 'block';
       }
     }
 
@@ -3359,28 +3364,39 @@ async function handleMyTrips(request, env, ip) {
 }
 
 async function handleStats(env) {
-  // UV（独立访客数）
-  const totalVisitors = await env.DB.prepare(
-    'SELECT COUNT(*) as total FROM visitors'
-  ).first();
+  try {
+    // UV（独立访客数）
+    const totalVisitors = await env.DB.prepare(
+      'SELECT COUNT(*) as total FROM visitors'
+    ).first();
 
-  // PV（页面浏览量）：所有IP的count总和
-  const totalPageViews = await env.DB.prepare(
-    'SELECT SUM(count) as total FROM visitors'
-  ).first();
+    // PV（页面浏览量）：所有IP的count总和
+    const totalPageViews = await env.DB.prepare(
+      'SELECT SUM(count) as total FROM visitors'
+    ).first();
 
-  // IP归属地排名（按最后访问时间排序，包含访问次数）
-  const topLocations = await env.DB.prepare(`
-    SELECT ip, country, city, count
-    FROM visitors
-    ORDER BY last_visit DESC
-  `).all();
+    // IP归属地排名（按最后访问时间排序，包含访问次数）
+    const topLocations = await env.DB.prepare(`
+      SELECT ip, country, city, count
+      FROM visitors
+      ORDER BY last_visit DESC
+    `).all();
 
-  return jsonResponse({
-    totalVisitors: totalVisitors.total || 0,
-    totalPageViews: totalPageViews.total || 0,
-    topLocations: topLocations.results
-  });
+    return jsonResponse({
+      totalVisitors: totalVisitors?.total || 0,
+      totalPageViews: totalPageViews?.total || 0,
+      topLocations: topLocations?.results || []
+    });
+  } catch (error) {
+    console.error('获取访客统计失败:', error);
+    return jsonResponse({
+      error: '获取统计数据失败',
+      details: error.message,
+      totalVisitors: 0,
+      totalPageViews: 0,
+      topLocations: []
+    }, 500);
+  }
 }
 
 // 按时间查询行程统计（不返回联系方式）
