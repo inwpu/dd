@@ -3033,8 +3033,9 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
   }
 
-  // 计算时间戳
-  const departureDateTime = new Date(`${departure_date}T${departure_time}:00`);
+  // 计算时间戳（用户输入的是北京时间，需要转换为UTC时间戳）
+  // 北京时间 = UTC+8，所以需要减去8小时
+  const departureDateTime = new Date(`${departure_date}T${departure_time}:00+08:00`);
   const departureTimestamp = departureDateTime.getTime();
   const now = Date.now();
   const sevenDaysLater = now + SEVEN_DAYS;
@@ -3487,12 +3488,15 @@ async function handleSearchByTime(request, env, ip) {
     return jsonResponse({ error: '缺少必填参数：date, start_time, end_time' }, 400);
   }
 
-  // 验证日期在三天内
-  const queryDate = new Date(`${date}T00:00:00`).getTime();
+  // 验证日期在三天内（用户输入的是北京时间）
+  const queryDate = new Date(`${date}T00:00:00+08:00`).getTime();
   const now = Date.now();
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStart = today.getTime();
+  // 获取北京时间的今天0点
+  const beijingOffset = 8 * 60 * 60 * 1000;
+  const utcMidnight = today.getTime() - (today.getTime() % (24 * 60 * 60 * 1000));
+  const beijingMidnight = utcMidnight - beijingOffset;
+  const todayStart = beijingMidnight;
   const threeDaysLater = todayStart + 3 * 24 * 60 * 60 * 1000;
 
   if (queryDate < todayStart) {
@@ -3506,9 +3510,9 @@ async function handleSearchByTime(request, env, ip) {
   // 记录查询
   await recordQueryAttempt(ip, env);
 
-  // 解析时间范围
-  const startTimestamp = new Date(`${date}T${startTime}:00`).getTime();
-  const endTimestamp = new Date(`${date}T${endTime}:00`).getTime();
+  // 解析时间范围（用户输入的是北京时间）
+  const startTimestamp = new Date(`${date}T${startTime}:00+08:00`).getTime();
+  const endTimestamp = new Date(`${date}T${endTime}:00+08:00`).getTime();
 
   if (isNaN(startTimestamp) || isNaN(endTimestamp)) {
     return jsonResponse({ error: '时间格式错误' }, 400);
@@ -3590,10 +3594,10 @@ async function handleSearchByRoute(request, env, ip) {
   `;
   let params = [];
 
-  // 如果指定了日期，添加日期过滤
+  // 如果指定了日期，添加日期过滤（用户输入的是北京时间）
   if (date) {
-    const dayStart = new Date(`${date}T00:00:00`).getTime();
-    const dayEnd = new Date(`${date}T23:59:59`).getTime();
+    const dayStart = new Date(`${date}T00:00:00+08:00`).getTime();
+    const dayEnd = new Date(`${date}T23:59:59+08:00`).getTime();
     query += ` AND departure_timestamp BETWEEN ? AND ?`;
     params.push(dayStart, dayEnd);
   }
@@ -3778,6 +3782,31 @@ async function handleCleanup(env) {
 
 async function cleanupExpiredTrips(env) {
   const now = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时的毫秒数
+
+  // 先修正旧数据的时区问题（一次性修复）
+  // 旧数据被错误地当作UTC时间保存，需要减去8小时转换为正确的北京时间时间戳
+  // 检测条件：departure_timestamp - now > 4小时，说明这可能是被错误保存的数据
+  // 我们只修正今天到未来7天内的数据，避免影响太久远的数据
+  const fourHoursInMs = 4 * 60 * 60 * 1000;
+  const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
+
+  // 获取需要修正的数据数量
+  const needFixCount = await env.DB.prepare(`
+    SELECT COUNT(*) as count FROM trips
+    WHERE departure_timestamp - ? > ?
+    AND departure_timestamp < ?
+  `).bind(now, fourHoursInMs, sevenDaysLater).first();
+
+  if (needFixCount && needFixCount.count > 0) {
+    console.log(`修正 ${needFixCount.count} 条旧数据的时区...`);
+    await env.DB.prepare(`
+      UPDATE trips
+      SET departure_timestamp = departure_timestamp - ?
+      WHERE departure_timestamp - ? > ?
+      AND departure_timestamp < ?
+    `).bind(beijingOffset, now, fourHoursInMs, sevenDaysLater).run();
+  }
 
   // 清理过期行程
   const tripsResult = await env.DB.prepare(
