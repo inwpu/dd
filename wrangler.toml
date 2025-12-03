@@ -8,6 +8,10 @@ binding = "DB"
 database_name = "xian_carpool_db"
 database_id = "24e4f1fc-fddf-4bb0-ad5c-551fd520c75e"
 
+# Cron Trigger - 每天凌晨3点自动清理过期数据
+[triggers]
+crons = ["0 3 * * *"]
+
 # 环境变量配置说明：
 # AMAP_KEY 需要通过 Cloudflare Dashboard 或 wrangler CLI 配置为加密环境变量
 # 不要在此文件中明文配置 API Key！

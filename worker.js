@@ -1185,10 +1185,47 @@ const INDEX_HTML = `<!DOCTYPE html>
     let userId = null; // 浏览器唯一标识
 
     // 生成或获取 user_id
-    function getOrCreateUserId() {
+    // 生成设备指纹（基于浏览器特征）
+    async function generateDeviceFingerprint() {
+      const features = [
+        navigator.userAgent,
+        navigator.language,
+        navigator.platform,
+        screen.width + 'x' + screen.height,
+        screen.colorDepth,
+        new Date().getTimezoneOffset(),
+        !!window.sessionStorage,
+        !!window.localStorage,
+        navigator.hardwareConcurrency || 'unknown',
+        navigator.deviceMemory || 'unknown'
+      ];
+
+      const fingerprintString = features.join('|');
+
+      // 使用SubtleCrypto API生成SHA-256哈希
+      const encoder = new TextEncoder();
+      const data = encoder.encode(fingerprintString);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      return 'fp_' + hashHex.substring(0, 32);
+    }
+
+    async function getOrCreateUserId() {
       let id = localStorage.getItem('carpool_user_id');
       if (!id) {
-        id = 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        // 使用更安全的方式生成用户ID
+        if (crypto.randomUUID) {
+          // 优先使用crypto.randomUUID（现代浏览器）
+          id = 'u_' + crypto.randomUUID();
+        } else {
+          // 降级方案：结合时间戳和设备指纹
+          const fingerprint = await generateDeviceFingerprint();
+          const timestamp = Date.now();
+          const random = Math.random().toString(36).substring(2, 15);
+          id = 'u_' + timestamp + '_' + random + '_' + fingerprint.substring(3, 15);
+        }
         localStorage.setItem('carpool_user_id', id);
       }
       return id;
@@ -1751,6 +1788,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       const departure_date = \`\${year}-\${month}-\${day}\`;
       const departure_time = \`\${hour}:\${minute}\`;
 
+      // 生成设备指纹用于防刷单
+      const deviceFingerprint = await generateDeviceFingerprint();
+
       const formData = {
         name: document.getElementById('name').value.trim(),
         departure_lat: selectedDeparture.lat,
@@ -1764,7 +1804,8 @@ const INDEX_HTML = `<!DOCTYPE html>
         contact: document.getElementById('contact').value.trim(),
         time_range: parseInt(document.getElementById('timeRange').value),
         user_key: userKey,
-        user_id: userId
+        user_id: userId,
+        device_fingerprint: deviceFingerprint
       };
 
       document.getElementById('loading').style.display = 'block';
@@ -1978,11 +2019,14 @@ const INDEX_HTML = `<!DOCTYPE html>
       const startTime = \`\${startHour}:\${startMinute}\`;
       const endTime = \`\${endHour}:\${endMinute}\`;
 
-      // 验证日期在三天内
-      const queryDate = new Date(\`\${date}T00:00:00\`);
+      // 验证日期在三天内（统一使用北京时间）
+      const queryDate = new Date(\`\${date}T00:00:00+08:00\`);
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // 设置为今天0点
-      const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+      // 获取北京时间的今天0点
+      const beijingOffset = 8 * 60 * 60 * 1000;
+      const utcMidnight = today.getTime() - (today.getTime() % (24 * 60 * 60 * 1000));
+      const beijingToday = new Date(utcMidnight - beijingOffset);
+      const threeDaysLater = new Date(beijingToday.getTime() + 3 * 24 * 60 * 60 * 1000);
 
       if (queryDate < today) {
         showMessage('只能查询今天及未来三天内的行程', 'error');
@@ -2069,12 +2113,15 @@ const INDEX_HTML = `<!DOCTYPE html>
         return;
       }
 
-      // 验证日期范围（如果填写了日期）
+      // 验证日期范围（如果填写了日期，统一使用北京时间）
       if (date) {
-        const queryDate = new Date(\`\${date}T00:00:00\`);
+        const queryDate = new Date(\`\${date}T00:00:00+08:00\`);
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const threeDaysLater = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+        // 获取北京时间的今天0点
+        const beijingOffset = 8 * 60 * 60 * 1000;
+        const utcMidnight = today.getTime() - (today.getTime() % (24 * 60 * 60 * 1000));
+        const beijingToday = new Date(utcMidnight - beijingOffset);
+        const threeDaysLater = new Date(beijingToday.getTime() + 3 * 24 * 60 * 60 * 1000);
 
         if (queryDate < today) {
           showMessage('只能查询今天及未来三天内的行程', 'error');
@@ -2260,8 +2307,8 @@ const INDEX_HTML = `<!DOCTYPE html>
             <div style="padding: 15px; background: white; margin-bottom: 12px; border-radius: 6px; border: 1px solid #c9a66b; \${trip.is_expired ? 'opacity: 0.7;' : ''}">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="font-weight: bold; color: #8b4513;">订单 #\${escapeHtml(String(trip.id))}</div>
-                <div style="font-size: 0.9em; color: \${trip.is_expired ? '#999' : '#28a745'};">
-                  \${trip.is_expired ? '已过期' : '进行中'}
+                <div style="font-size: 0.9em; color: \${trip.is_expired ? '#999' : (trip.match_count > 0 ? '#007bff' : '#28a745')};">
+                  \${trip.is_expired ? '已过期' : (trip.match_count > 0 ? '已完成' : '进行中')}
                 </div>
               </div>
 
@@ -2284,7 +2331,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
               <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0d0b0;">
                 <span style="color: #8b4513;">
-                  匹配状态：\${trip.match_count > 0 ? \`已确认 \${escapeHtml(String(trip.match_count))} 个匹配\` : '暂无匹配'}
+                  匹配状态：\${trip.match_count > 0 ? '已完成拼车匹配' : '暂无匹配'}
                 </span>
               </div>
             </div>
@@ -2715,6 +2762,15 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const ip = request.headers.get('CF-Connecting-IP');
+
+    // 安全检查：必须来自Cloudflare
+    if (!ip) {
+      return new Response(JSON.stringify({ error: '禁止直接访问' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const ua = request.headers.get('User-Agent') || '';
 
     // CORS处理
@@ -2733,6 +2789,32 @@ export default {
       const crawlerCheck = await checkCrawler(ua, ip, env);
       if (!crawlerCheck.allowed) {
         return jsonResponse({ error: crawlerCheck.reason }, 403);
+      }
+
+      // CSRF防护：检查POST请求的Origin和Referer
+      if (request.method === 'POST') {
+        const origin = request.headers.get('Origin');
+        const referer = request.headers.get('Referer');
+        const host = request.headers.get('Host') || url.host;
+
+        // 如果有Origin头，必须匹配当前域名
+        if (origin) {
+          const originHost = new URL(origin).host;
+          if (originHost !== host) {
+            return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+          }
+        }
+        // 如果有Referer头，必须来自当前域名
+        else if (referer) {
+          const refererHost = new URL(referer).host;
+          if (refererHost !== host) {
+            return jsonResponse({ error: 'CSRF检测：请求来源不合法' }, 403);
+          }
+        }
+        // 如果都没有，拒绝请求（可能是直接调用API）
+        else {
+          return jsonResponse({ error: 'CSRF检测：缺少请求来源信息' }, 403);
+        }
       }
 
       // 路由
@@ -2800,6 +2882,17 @@ export default {
     } catch (error) {
       console.error('Worker error:', error);
       return jsonResponse({ error: 'Internal server error' }, 500);
+    }
+  },
+
+  // Cron Trigger - 每天自动清理过期数据
+  async scheduled(event, env, ctx) {
+    console.log('Cron job started: cleaning expired data...');
+    try {
+      const deleted = await cleanupExpiredTrips(env);
+      console.log('Cron job completed:', deleted);
+    } catch (error) {
+      console.error('Cron job error:', error);
     }
   }
 };
@@ -2953,11 +3046,25 @@ async function handleResolvePOI(request, env) {
 // 创建行程
 async function handleCreateTrip(request, env, ip) {
   const body = await request.json();
-  const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id } = body;
+  const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
 
   // 验证必填字段
   if (!name || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
+  }
+
+  // 验证姓名长度（2-20个字符）
+  const trimmedName = name.trim();
+  if (trimmedName.length < 2 || trimmedName.length > 20) {
+    return jsonResponse({ error: '姓名长度应为2-20个字符' }, 400);
+  }
+
+  // 验证地点名称长度（2-100个字符）
+  if (departure_location_name.length < 2 || departure_location_name.length > 100) {
+    return jsonResponse({ error: '出发地名称长度应为2-100个字符' }, 400);
+  }
+  if (destination_location_name.length < 2 || destination_location_name.length > 100) {
+    return jsonResponse({ error: '目的地名称长度应为2-100个字符' }, 400);
   }
 
   // 验证坐标合法性（西安市及周边范围：经度107-110，纬度33-35）
@@ -2975,11 +3082,6 @@ async function handleCreateTrip(request, env, ip) {
 
   if (!isValidCoord(destination_lat, destination_lon)) {
     return jsonResponse({ error: '目的地坐标异常，请重新选择地点' }, 400);
-  }
-
-  // 验证地点名称不为空且合理
-  if (departure_location_name.length < 2 || destination_location_name.length < 2) {
-    return jsonResponse({ error: '地点名称过短，请选择完整的地点名称' }, 400);
   }
 
   // 检测异常坐标：出发地和目的地坐标完全相同
@@ -3039,6 +3141,21 @@ async function handleCreateTrip(request, env, ip) {
       error: '发布过于频繁，请稍后再试',
       hint: '为防止刷单，每5分钟最多发布3次行程'
     }, 429);
+  }
+
+  // 检查设备指纹高频（如果提供了设备指纹，检查1小时内最多5次）
+  if (device_fingerprint) {
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const fingerprintCount = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM trips WHERE user_id LIKE ? AND created_at > ?'
+    ).bind('%' + device_fingerprint.substring(3, 15) + '%', oneHourAgo).first();
+
+    if (fingerprintCount.count >= 5) {
+      return jsonResponse({
+        error: '检测到异常发单行为，请稍后再试',
+        hint: '同一设备1小时内最多发布5次行程'
+      }, 429);
+    }
   }
 
   // 检测坐标作弊：检查是否有多个不同用户使用完全相同的坐标
@@ -3215,7 +3332,7 @@ async function handleMatch(request, env, ip) {
   const matches = [];
   const currentTime = Date.now();
   const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
-  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
 
   for (const trip of trips.results) {
     // 修正旧数据的时间戳
@@ -3230,6 +3347,21 @@ async function handleMatch(request, env, ip) {
     // 过滤已过期的行程（使用修正后的时间戳）
     if (actualTimestamp < currentTime) {
       continue;
+    }
+
+    // 检查对方是否已被匹配
+    const otherMatchRecord = await env.DB.prepare(
+      'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
+    ).bind(trip.id, trip.id).first();
+
+    // 如果对方已被匹配，且不是匹配给当前用户，则跳过
+    if (otherMatchRecord) {
+      const isMatchedWithCurrentUser =
+        (otherMatchRecord.trip_id_1 === trip_id || otherMatchRecord.trip_id_2 === trip_id);
+
+      if (!isMatchedWithCurrentUser) {
+        continue; // 跳过已被其他人匹配的行程
+      }
     }
 
     const departureDistance = haversineDistance(userDepartureLat, userDepartureLon, trip.departure_lat, trip.departure_lon);
@@ -3316,16 +3448,51 @@ async function handleConfirmMatch(request, env, ip) {
     return jsonResponse({ error: '匹配的行程不存在' }, 404);
   }
 
+  // 检查 my_trip_id 是否已经匹配过其他订单
+  const myExistingMatch = await env.DB.prepare(
+    'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
+  ).bind(my_trip_id, my_trip_id).first();
+
+  if (myExistingMatch) {
+    return jsonResponse({ error: '您的订单已经完成拼车匹配，无法再次匹配' }, 400);
+  }
+
+  // 检查 matched_trip_id 是否已经匹配过其他订单
+  const matchedExistingMatch = await env.DB.prepare(
+    'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
+  ).bind(matched_trip_id, matched_trip_id).first();
+
+  if (matchedExistingMatch) {
+    return jsonResponse({ error: '对方的订单已经完成拼车匹配，请选择其他拼车伙伴' }, 400);
+  }
+
   // 确保 trip_id_1 < trip_id_2 以满足 UNIQUE 约束
   const [trip1, trip2] = my_trip_id < matched_trip_id ?
     [my_trip_id, matched_trip_id] : [matched_trip_id, my_trip_id];
 
   try {
-    await env.DB.prepare(`
+    const result = await env.DB.prepare(`
       INSERT INTO trip_matches (trip_id_1, trip_id_2, confirmed_by, confirmed_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(trip_id_1, trip_id_2) DO NOTHING
     `).bind(trip1, trip2, my_trip_id, Date.now()).run();
+
+    // 检查是否真的插入成功（防止竞态条件）
+    if (result.meta.changes === 0) {
+      // 说明有并发冲突，重新检查匹配状态
+      const existingMatch = await env.DB.prepare(
+        'SELECT * FROM trip_matches WHERE (trip_id_1 = ? OR trip_id_2 = ?) OR (trip_id_1 = ? OR trip_id_2 = ?)'
+      ).bind(my_trip_id, my_trip_id, matched_trip_id, matched_trip_id).first();
+
+      if (existingMatch) {
+        // 判断是谁已经被匹配了
+        if (existingMatch.trip_id_1 === my_trip_id || existingMatch.trip_id_2 === my_trip_id) {
+          return jsonResponse({ error: '您的订单已经完成拼车匹配，无法再次匹配' }, 400);
+        } else {
+          return jsonResponse({ error: '对方的订单已经完成拼车匹配，请选择其他拼车伙伴' }, 400);
+        }
+      }
+    }
 
     return jsonResponse({ success: true });
   } catch (error) {
@@ -3372,17 +3539,11 @@ async function handleMyTrips(request, env, ip) {
 
   // 查询每个订单的匹配状态
   const tripsWithStatus = await Promise.all(trips.results.map(async trip => {
-    // 查询该订单的所有匹配确认记录
+    // 查询该订单的匹配确认记录
     const matches = await env.DB.prepare(`
       SELECT * FROM trip_matches
       WHERE trip_id_1 = ? OR trip_id_2 = ?
-      OR trip_id_1 = ? OR trip_id_2 = ?
-    `).bind(
-      Math.min(trip.id, trip.id),
-      Math.max(trip.id, trip.id),
-      Math.min(trip.id, trip.id),
-      Math.max(trip.id, trip.id)
-    ).all();
+    `).bind(trip.id, trip.id).all();
 
     const matchCount = matches.results ? matches.results.length : 0;
 
@@ -3500,7 +3661,7 @@ async function handleSearchByTime(request, env, ip) {
 
   // 查询该时间段内的行程（需要考虑旧数据的时区偏移问题）
   // 旧数据的 departure_timestamp 被错误保存（多加了8小时），所以需要查询时间+8小时的范围
-  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
   const oldDataStartTimestamp = startTimestamp + beijingOffset;
   const oldDataEndTimestamp = endTimestamp + beijingOffset;
 
@@ -3612,7 +3773,7 @@ async function handleSearchByRoute(request, env, ip) {
   const matchedTrips = [];
   const currentTime = Date.now();
   const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
-  const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
 
   for (const trip of allTrips.results) {
     // 修正旧数据的时间戳
@@ -3820,10 +3981,11 @@ async function cleanupExpiredTrips(env) {
     `).bind(beijingOffset, now, fourHoursInMs, sevenDaysLater).run();
   }
 
-  // 清理过期行程
+  // 清理过期行程（出发时间超过7天的订单）
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
   const tripsResult = await env.DB.prepare(
     'DELETE FROM trips WHERE departure_timestamp < ?'
-  ).bind(now).run();
+  ).bind(sevenDaysAgo).run();
 
   // 清理过期IP封禁
   const ipBansResult = await env.DB.prepare(
@@ -3836,7 +3998,6 @@ async function cleanupExpiredTrips(env) {
   ).bind(now).run();
 
   // 清理7天前的发单频率记录
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
   const tripLimitsResult = await env.DB.prepare(
     'DELETE FROM trip_limits WHERE last_trip < ?'
   ).bind(sevenDaysAgo).run();
