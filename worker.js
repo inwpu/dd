@@ -881,7 +881,6 @@ const INDEX_HTML = `<!DOCTYPE html>
         <li>出发地点距离≤1公里</li>
         <li>目的地距离≤1公里</li>
         <li>出发时间相差≤1小时</li>
-        <li>最多显示2个匹配结果</li>
       </ul>
     </div>
 
@@ -967,7 +966,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       <div class="tip">
         <strong style="color: #d9534f;"> 防刷单规则：</strong>
         <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
-          <li>同一手机号1小时内最多发布2次</li>
+          <li>同一手机号1小时内最多发布3次</li>
           <li>严禁使用脚本刷单，一经发现IP封禁24小时，手机号封禁7天（到期自动解封）</li>
         </ul>
         <p style="margin-top: 10px;">提示：匹配成功后建议优先电话联系，方便快速沟通。</p>
@@ -1254,40 +1253,6 @@ const INDEX_HTML = `<!DOCTYPE html>
         document.querySelector('.tab:nth-child(4)').classList.add('active');
       }
     }
-
-    const SCHOOLS = [
-      "西北工业大学",
-      "西安交通大学",
-      "西安电子科技大学",
-      "长安大学",
-      "陕西师范大学",
-      "西北大学",
-      "西安建筑科技大学",
-      "西安理工大学",
-      "西安科技大学",
-      "西安工业大学",
-      "西安外国语大学",
-      "西安石油大学",
-      "西安工程大学",
-      "西安邮电大学",
-      "西安医学院",
-      "西安财经大学",
-      "西北政法大学",
-      "西安体育学院",
-      "西安音乐学院",
-      "西安美术学院",
-      "西安文理学院",
-      "西安航空学院",
-      "西安培华学院",
-      "西安思源学院",
-      "西安翻译学院",
-      "西京学院",
-      "西安欧亚学院",
-      "西安外事学院",
-      "西安交通工程学院",
-      "西安信息职业大学",
-      "西安交通职业大学"
-    ];
 
     // HTML转义函数，防止XSS攻击
     function escapeHtml(unsafe) {
@@ -3110,7 +3075,7 @@ async function handleCreateTrip(request, env, ip) {
     'SELECT COUNT(*) as count FROM trips WHERE contact = ? AND created_at > ?'
   ).bind(contact, oneHourAgo).first();
 
-  if (phoneCount.count >= 2) {
+  if (phoneCount.count >= 3) {
     return jsonResponse({
       error: '该手机号1小时内已发布过行程，请勿重复发单',
       hint: '如需修改行程，请稍后再试'
@@ -3542,7 +3507,6 @@ async function handleSearchByTime(request, env, ip) {
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
-  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
   const fixCutoffTime = 1733184000000; // 2024-12-03 00:00 UTC，在此之前创建的数据需要修正
   const filteredTrips = [];
 
