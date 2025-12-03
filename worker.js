@@ -3537,7 +3537,6 @@ async function handleSearchByTime(request, env, ip) {
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
-  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
   const filteredTrips = [];
 
   for (const trip of trips.results) {
