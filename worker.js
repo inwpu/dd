@@ -3243,7 +3243,14 @@ async function handleMatch(request, env, ip) {
 
   // 两点一线匹配：使用智能匹配（距离 + 名称相似度）
   const matches = [];
+  const currentTime = Date.now();
+
   for (const trip of trips.results) {
+    // 过滤已过期的行程
+    if (trip.departure_timestamp < currentTime) {
+      continue;
+    }
+
     const departureDistance = haversineDistance(userDepartureLat, userDepartureLon, trip.departure_lat, trip.departure_lon);
     const destinationDistance = haversineDistance(userDestinationLat, userDestinationLon, trip.destination_lat, trip.destination_lon);
 
@@ -3267,6 +3274,11 @@ async function handleMatch(request, env, ip) {
       ).bind(trip1, trip2).first();
 
       const isMatched = !!matchRecord;
+
+      // 过滤已匹配的行程
+      if (isMatched) {
+        continue;
+      }
 
       matches.push({
         id: trip.id,
@@ -3510,13 +3522,36 @@ async function handleSearchByTime(request, env, ip) {
     ORDER BY departure_timestamp
   `).bind(startTimestamp, endTimestamp).all();
 
+  // 过滤已过期或已匹配的行程
+  const currentTime = Date.now();
+  const filteredTrips = [];
+
+  for (const trip of trips.results) {
+    // 过滤已过期的行程
+    if (trip.departure_timestamp < currentTime) {
+      continue;
+    }
+
+    // 检查是否已匹配
+    const matchRecord = await env.DB.prepare(
+      'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
+    ).bind(trip.id, trip.id).first();
+
+    // 过滤已匹配的行程
+    if (matchRecord) {
+      continue;
+    }
+
+    filteredTrips.push(trip);
+  }
+
   return jsonResponse({
-    total: trips.results.length,
+    total: filteredTrips.length,
     time_range: {
       start: `${date} ${startTime}`,
       end: `${date} ${endTime}`
     },
-    trips: trips.results.map(t => ({
+    trips: filteredTrips.map(t => ({
       departure: t.departure_location_name,
       destination: t.destination_location_name,
       departure_time: `${t.departure_date} ${t.departure_time}`
@@ -3569,8 +3604,24 @@ async function handleSearchByRoute(request, env, ip) {
 
   // 距离筛选和数据处理
   const matchedTrips = [];
+  const currentTime = Date.now();
 
   for (const trip of allTrips.results) {
+    // 过滤已过期的行程
+    if (trip.departure_timestamp < currentTime) {
+      continue;
+    }
+
+    // 检查是否已匹配
+    const matchRecord = await env.DB.prepare(
+      'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
+    ).bind(trip.id, trip.id).first();
+
+    // 过滤已匹配的行程
+    if (matchRecord) {
+      continue;
+    }
+
     let matchScore = 0;
     let departureDistance = null;
     let destinationDistance = null;
