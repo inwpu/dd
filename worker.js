@@ -3060,7 +3060,13 @@ async function handleResolvePOI(request, env) {
 async function handleCreateTrip(request, env, ip) {
   try {
     const body = await request.json();
-    const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
+    let { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
+
+  // 确保坐标是字符串或数字类型（修复 D1_TYPE_ERROR）
+  departure_lat = String(departure_lat);
+  departure_lon = String(departure_lon);
+  destination_lat = String(destination_lat);
+  destination_lon = String(destination_lon);
 
   // 验证必填字段
   if (!name || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
