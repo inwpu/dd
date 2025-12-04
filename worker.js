@@ -1811,8 +1811,6 @@ const INDEX_HTML = `<!DOCTYPE html>
       document.getElementById('loading').style.display = 'block';
       document.getElementById('matches').innerHTML = '';
 
-      updateTimeQueryResult('正在查询，请稍候...');
-
       try {
         // 创建行程
         const createResponse = await fetch(\`\${API_BASE}/api/create-trip\`, {
@@ -1999,22 +1997,9 @@ const INDEX_HTML = `<!DOCTYPE html>
       }, 5000);
     }
 
-    const timeQueryResultContainer = document.getElementById('timeQueryResult');
-
-    function updateTimeQueryResult(message) {
-      if (message) {
-        timeQueryResultContainer.innerHTML = \`
-          <div class="tip">\${escapeHtml(message)}</div>
-        \`;
-      } else {
-        timeQueryResultContainer.innerHTML = '';
-      }
-    }
-
     // 按时间查询
     document.getElementById('timeQueryForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      updateTimeQueryResult('');
 
       // 组装日期和时间
       const year = document.getElementById('queryYear').value;
@@ -2026,9 +2011,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       const endMinute = document.getElementById('queryEndMinute').value;
 
       if (!year || !month || !day || !startHour || !startMinute || !endHour || !endMinute) {
-        const msg = '请完整填写查询日期和时间范围';
-        showMessage(msg, 'error');
-        updateTimeQueryResult(msg);
+        showMessage('请完整填写查询日期和时间范围', 'error');
         return;
       }
 
@@ -2046,16 +2029,12 @@ const INDEX_HTML = `<!DOCTYPE html>
       const threeDaysLater = new Date(beijingToday.getTime() + 3 * 24 * 60 * 60 * 1000);
 
       if (queryDate < today) {
-        const msg = '只能查询今天及未来三天内的行程';
-        showMessage(msg, 'error');
-        updateTimeQueryResult(msg);
+        showMessage('只能查询今天及未来三天内的行程', 'error');
         return;
       }
 
       if (queryDate > threeDaysLater) {
-        const msg = '只能查询三天内的行程';
-        showMessage(msg, 'error');
-        updateTimeQueryResult(msg);
+        showMessage('只能查询三天内的行程', 'error');
         return;
       }
 
@@ -2064,18 +2043,14 @@ const INDEX_HTML = `<!DOCTYPE html>
         const data = await response.json();
 
         if (!response.ok) {
-          const msg = data.error || '查询失败';
-          showMessage(msg, 'error');
-          updateTimeQueryResult(msg);
+          showMessage(data.error || '查询失败', 'error');
           return;
         }
 
         displayTimeQueryResult(data);
       } catch (error) {
         console.error('查询失败:', error);
-        const msg = '网络错误，请稍后重试';
-        showMessage(msg, 'error');
-        updateTimeQueryResult(msg);
+        showMessage('网络错误，请稍后重试', 'error');
       }
     });
 
@@ -2769,8 +2744,6 @@ const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 const MAX_MATCH_PER_DAY = 100; // 每天最多匹配5次
 const MIN_SEARCH_LENGTH = 2; // 最小搜索长度（字符）
 const MAX_QUERY_PER_MINUTE = 10; // 每分钟最多查询10次
-const BEIJING_OFFSET = 8 * 60 * 60 * 1000; // 8小时毫秒数
-const FIX_CUTOFF_TIME = 1764691200000; // 北京时间 2025-12-03 00:00:00
 
 // IP白名单（测试用，不会被封禁）
 const IP_WHITELIST = [
@@ -3087,36 +3060,12 @@ async function handleResolvePOI(request, env) {
 async function handleCreateTrip(request, env, ip) {
   try {
     const body = await request.json();
-    const {
-      name,
-      school,
-      campus,
-      college,
-      departure_lat,
-      departure_lon,
-      departure_location_name,
-      destination_lat,
-      destination_lon,
-      destination_location_name,
-      departure_date,
-      departure_time,
-      contact,
-      time_range,
-      user_key,
-      user_id,
-      device_fingerprint
-    } = body;
+    const { name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, contact, time_range, user_key, user_id, device_fingerprint } = body;
 
   // 验证必填字段
   if (!name || !departure_lat || !departure_lon || !departure_location_name || !destination_lat || !destination_lon || !destination_location_name || !departure_date || !departure_time || !contact || !time_range || !user_key || !user_id) {
     return jsonResponse({ error: '缺少必填字段' }, 400);
   }
-
-  const normalizedSchool = (typeof school === 'string' && school.trim().length > 0)
-    ? school.trim().slice(0, 50)
-    : '未填写';
-  const normalizedCampus = (typeof campus === 'string' ? campus.trim() : '').slice(0, 50);
-  const normalizedCollege = (typeof college === 'string' ? college.trim() : '').slice(0, 50);
 
   // 验证姓名长度（2-20个字符）
   const trimmedName = name.trim();
@@ -3309,61 +3258,10 @@ async function handleCreateTrip(request, env, ip) {
   }
 
   // 插入数据库（包含出发地和目的地、user_key、user_id）
-  const tripColumns = await getTripColumns(env);
-  const hasSchoolColumns = tripColumns.includes('school') && tripColumns.includes('campus') && tripColumns.includes('college');
-
-  let insertSql = `
+  const result = await env.DB.prepare(`
     INSERT INTO trips (name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  let insertParams = [
-    name,
-    departure_lat,
-    departure_lon,
-    departure_location_name,
-    destination_lat,
-    destination_lon,
-    destination_location_name,
-    departure_date,
-    departure_time,
-    departureTimestamp,
-    contact,
-    timeRangeValue,
-    ip,
-    user_key,
-    user_id,
-    now
-  ];
-
-  if (hasSchoolColumns) {
-    insertSql = `
-      INSERT INTO trips (name, school, campus, college, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departure_timestamp, contact, time_range, ip, user_key, user_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    insertParams = [
-      name,
-      normalizedSchool,
-      normalizedCampus,
-      normalizedCollege,
-      departure_lat,
-      departure_lon,
-      departure_location_name,
-      destination_lat,
-      destination_lon,
-      destination_location_name,
-      departure_date,
-      departure_time,
-      departureTimestamp,
-      contact,
-      timeRangeValue,
-      ip,
-      user_key,
-      user_id,
-      now
-    ];
-  }
-
-  const result = await env.DB.prepare(insertSql).bind(...insertParams).run();
+  `).bind(name, departure_lat, departure_lon, departure_location_name, destination_lat, destination_lon, destination_location_name, departure_date, departure_time, departureTimestamp, contact, timeRangeValue, ip, user_key, user_id, now).run();
 
   // 更新发单频率计数
   await env.DB.prepare(`
@@ -3415,11 +3313,10 @@ async function handleMatch(request, env, ip) {
 
   // 验证行程时间是否有效
   const now = Date.now();
-  const normalizedUserTripTime = normalizeTripTime(userTrip);
 
   // 直接使用原始时间戳判断，不进行修正
   // 新数据已经使用了正确的北京时间，旧数据会在查询时被过滤
-  if (normalizedUserTripTime.actualTimestamp < now) {
+  if (userTrip.departure_timestamp < now) {
     return jsonResponse({ error: '您的行程已过期，无法进行匹配' }, 400);
   }
 
@@ -3458,9 +3355,18 @@ async function handleMatch(request, env, ip) {
   // 两点一线匹配：使用智能匹配（距离 + 名称相似度）
   const matches = [];
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
 
   for (const trip of trips.results) {
-    const { actualTimestamp, date: normalizedDate, time: normalizedTime } = normalizeTripTime(trip);
+    // 修正旧数据的时间戳
+    // 判断：如果 created_at < fixCutoffTime，说明是旧数据，时间戳需要减去8小时
+    let actualTimestamp = trip.departure_timestamp;
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
 
     // 过滤已过期的行程（使用修正后的时间戳）
     if (actualTimestamp < currentTime) {
@@ -3512,8 +3418,8 @@ async function handleMatch(request, env, ip) {
         name: trip.name,
         departure_location_name: trip.departure_location_name,
         destination_location_name: trip.destination_location_name,
-        departure_date: normalizedDate,
-        departure_time: normalizedTime,
+        departure_date: trip.departure_date,
+        departure_time: trip.departure_time,
         contact: trip.contact, // 始终返回联系方式
         departure_distance: departureDistance.toFixed(2),
         destination_distance: destinationDistance.toFixed(2),
@@ -3528,13 +3434,14 @@ async function handleMatch(request, env, ip) {
 
   // 记录匹配次数
   await recordMatchAttempt(ip, today, env);
+
   return jsonResponse({
     matches: finalMatches,
     your_trip: {
       id: userTrip.id,
       departure: userTrip.departure_location_name,
       destination: userTrip.destination_location_name,
-      time: `${normalizedUserTripTime.date} ${normalizedUserTripTime.time}`
+      time: `${userTrip.departure_date} ${userTrip.departure_time}`
     }
   });
 }
@@ -3663,19 +3570,18 @@ async function handleMyTrips(request, env, ip) {
     `).bind(trip.id, trip.id).all();
 
     const matchCount = matches.results ? matches.results.length : 0;
-    const normalizedTime = normalizeTripTime(trip);
 
     return {
       id: trip.id,
       name: trip.name,
       departure: trip.departure_location_name,
       destination: trip.destination_location_name,
-      departure_date: normalizedTime.date,
-      departure_time: normalizedTime.time,
+      departure_date: trip.departure_date,
+      departure_time: trip.departure_time,
       contact: trip.contact,
       match_count: matchCount,
       created_at: trip.created_at,
-      is_expired: normalizedTime.actualTimestamp < Date.now()
+      is_expired: trip.departure_timestamp < Date.now()
     };
   }));
 
@@ -3752,8 +3658,9 @@ async function handleSearchByTime(request, env, ip) {
   const now = Date.now();
   const today = new Date();
   // 获取北京时间的今天0点
+  const beijingOffset = 8 * 60 * 60 * 1000;
   const utcMidnight = today.getTime() - (today.getTime() % (24 * 60 * 60 * 1000));
-  const beijingMidnight = utcMidnight - BEIJING_OFFSET;
+  const beijingMidnight = utcMidnight - beijingOffset;
   const todayStart = beijingMidnight;
   const threeDaysLater = todayStart + 3 * 24 * 60 * 60 * 1000;
 
@@ -3778,8 +3685,9 @@ async function handleSearchByTime(request, env, ip) {
 
   // 查询该时间段内的行程（需要考虑旧数据的时区偏移问题）
   // 旧数据的 departure_timestamp 被错误保存（多加了8小时），所以需要查询时间+8小时的范围
-  const oldDataStartTimestamp = startTimestamp + BEIJING_OFFSET;
-  const oldDataEndTimestamp = endTimestamp + BEIJING_OFFSET;
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
+  const oldDataStartTimestamp = startTimestamp + beijingOffset;
+  const oldDataEndTimestamp = endTimestamp + beijingOffset;
 
   const trips = await env.DB.prepare(`
     SELECT id, departure_location_name, destination_location_name, departure_date, departure_time, departure_timestamp, created_at
@@ -3790,14 +3698,20 @@ async function handleSearchByTime(request, env, ip) {
       (created_at < ? AND departure_timestamp BETWEEN ? AND ?)
     )
     ORDER BY departure_timestamp
-  `).bind(FIX_CUTOFF_TIME, startTimestamp, endTimestamp, FIX_CUTOFF_TIME, oldDataStartTimestamp, oldDataEndTimestamp).all();
+  `).bind(fixCutoffTime, startTimestamp, endTimestamp, fixCutoffTime, oldDataStartTimestamp, oldDataEndTimestamp).all();
 
   // 过滤已过期或已匹配的行程
   const currentTime = Date.now();
   const filteredTrips = [];
 
   for (const trip of trips.results) {
-    const { actualTimestamp, date: normalizedDate, time: normalizedTime } = normalizeTripTime(trip);
+    // 修正旧数据的时间戳
+    let actualTimestamp = trip.departure_timestamp;
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
 
     // 过滤已过期的行程（使用修正后的时间戳）
     if (actualTimestamp < currentTime) {
@@ -3819,20 +3733,23 @@ async function handleSearchByTime(request, env, ip) {
       continue;
     }
 
-    filteredTrips.push({
-      departure: trip.departure_location_name,
-      destination: trip.destination_location_name,
-      departure_time: `${normalizedDate} ${normalizedTime}`
-    });
+    filteredTrips.push(trip);
   }
 
+  // 二次验证：过滤掉 departure_date 与查询日期不匹配的数据（修复数据不一致问题）
+  const finalTrips = filteredTrips.filter(t => t.departure_date === date);
+
   return jsonResponse({
-    total: filteredTrips.length,
+    total: finalTrips.length,
     time_range: {
       start: `${date} ${startTime}`,
       end: `${date} ${endTime}`
     },
-    trips: filteredTrips
+    trips: finalTrips.map(t => ({
+      departure: t.departure_location_name,
+      destination: t.destination_location_name,
+      departure_time: `${t.departure_date} ${t.departure_time}`
+    }))
   });
 }
 
@@ -3882,9 +3799,17 @@ async function handleSearchByRoute(request, env, ip) {
   // 距离筛选和数据处理
   const matchedTrips = [];
   const currentTime = Date.now();
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时
+  const fixCutoffTime = 1764691200000; // 北京时间 2025-12-03 00:00:00，在此之前创建的数据需要修正
 
   for (const trip of allTrips.results) {
-    const { actualTimestamp, date: normalizedDate, time: normalizedTime } = normalizeTripTime(trip);
+    // 修正旧数据的时间戳
+    let actualTimestamp = trip.departure_timestamp;
+
+    if (trip.created_at && trip.created_at < fixCutoffTime) {
+      // 这是旧数据，departure_timestamp被错误保存，需要修正
+      actualTimestamp = trip.departure_timestamp - beijingOffset;
+    }
 
     // 过滤已过期的行程（使用修正后的时间戳）
     if (actualTimestamp < currentTime) {
@@ -3945,9 +3870,7 @@ async function handleSearchByRoute(request, env, ip) {
       matchedTrips.push({
         ...trip,
         departure_distance: departureDistance ? departureDistance.toFixed(2) : null,
-        destination_distance: destinationDistance ? destinationDistance.toFixed(2) : null,
-        departure_date_display: normalizedDate,
-        departure_time_display: normalizedTime
+        destination_distance: destinationDistance ? destinationDistance.toFixed(2) : null
       });
     }
   }
@@ -3962,7 +3885,7 @@ async function handleSearchByRoute(request, env, ip) {
   };
 
   matchedTrips.forEach(trip => {
-    const time = trip.departure_time_display.split(':')[0];
+    const time = trip.departure_time.split(':')[0];
     const hour = parseInt(time);
 
     if (hour >= 6 && hour < 9) timeSlots['早晨(06:00-09:00)']++;
@@ -3983,7 +3906,7 @@ async function handleSearchByRoute(request, env, ip) {
     trips: matchedTrips.map(t => ({
       departure: t.departure_location_name,
       destination: t.destination_location_name,
-      departure_time: `${t.departure_date_display} ${t.departure_time_display}`,
+      departure_time: `${t.departure_date} ${t.departure_time}`,
       departure_distance: t.departure_distance,
       destination_distance: t.destination_distance
     })),
@@ -4059,7 +3982,7 @@ async function handleCleanup(env) {
 
 async function cleanupExpiredTrips(env) {
   const now = Date.now();
-  const beijingOffset = BEIJING_OFFSET; // 8小时的毫秒数
+  const beijingOffset = 8 * 60 * 60 * 1000; // 8小时的毫秒数
 
   // 时区修正逻辑已移除
   // fixCutoffTime (2025-12-03 00:00) 之前创建的旧数据会在查询时动态修正
@@ -4113,56 +4036,6 @@ async function cleanupExpiredTrips(env) {
     tripLimits: tripLimitsResult.meta.changes,
     matchLimits: matchLimitsResult.meta.changes,
     queryLimits: queryLimitsResult.meta.changes
-  };
-}
-
-let tripColumnsCache = null;
-let lastTripColumnsFetch = 0;
-const TRIP_COLUMNS_CACHE_TTL = 5 * 60 * 1000;
-
-async function getTripColumns(env) {
-  const now = Date.now();
-  if (tripColumnsCache && (now - lastTripColumnsFetch) < TRIP_COLUMNS_CACHE_TTL) {
-    return tripColumnsCache;
-  }
-
-  try {
-    const pragmaResult = await env.DB.prepare('PRAGMA table_info(trips)').all();
-    if (pragmaResult && Array.isArray(pragmaResult.results)) {
-      tripColumnsCache = pragmaResult.results.map(col => col.name);
-      lastTripColumnsFetch = now;
-      return tripColumnsCache;
-    }
-  } catch (error) {
-    console.error('获取trips表结构失败:', error);
-  }
-
-  return tripColumnsCache || [];
-}
-
-function getActualDepartureTimestamp(trip) {
-  if (trip?.created_at && trip.created_at < FIX_CUTOFF_TIME) {
-    return trip.departure_timestamp - BEIJING_OFFSET;
-  }
-  return trip.departure_timestamp;
-}
-
-function formatBeijingDateTime(timestamp) {
-  const beijingIso = new Date(timestamp + BEIJING_OFFSET).toISOString();
-  const [datePart, timePart] = beijingIso.split('T');
-  return {
-    date: datePart,
-    time: timePart.slice(0, 5)
-  };
-}
-
-function normalizeTripTime(trip) {
-  const actualTimestamp = getActualDepartureTimestamp(trip);
-  const { date, time } = formatBeijingDateTime(actualTimestamp);
-  return {
-    actualTimestamp,
-    date,
-    time
   };
 }
 
