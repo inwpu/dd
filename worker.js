@@ -982,7 +982,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       </form>
 
       <div id="loading" class="loading">
-        <p>正在匹配拼车信息</p>
+        <p>正在匹配拼车信息中，请稍候...</p>
       </div>
 
       <div id="message"></div>
