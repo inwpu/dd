@@ -1906,22 +1906,33 @@ const INDEX_HTML = `<!DOCTYPE html>
       // 如果有已匹配的订单，只显示已匹配的
       if (matchedTrips.length > 0) {
         container.innerHTML = \`
-          <h2 style="color: #28a745; margin-bottom: 20px; border-bottom: 2px solid #28a745; padding-bottom: 10px;">
-            ✓ 您已确认匹配成功
+          <div class="match-card" style="border: 3px solid #5b9bd5; background-color: #e7f2fa; margin-bottom: 30px;">
+            <div style="background-color: #5b9bd5; color: white; padding: 10px 15px; margin: -15px -15px 15px -15px; font-weight: bold; font-size: 1.1em;">
+              我的行程信息
+            </div>
+            <div class="match-info">
+              <div>出发地：\${yourTrip ? escapeHtml(yourTrip.departure) : '-'}</div>
+              <div>目的地：\${yourTrip ? escapeHtml(yourTrip.destination) : '-'}</div>
+              <div>出发时间：\${yourTrip ? escapeHtml(yourTrip.time) : '-'}</div>
+            </div>
+          </div>
+
+          <h2 style="color: #28a745; margin-bottom: 20px; border-bottom: 3px solid #28a745; padding-bottom: 10px; font-size: 1.3em;">
+            拼车伙伴信息（已匹配成功）
           </h2>
           \${matchedTrips.map(match => \`
-            <div class="match-card" style="border: 2px solid #28a745;">
-              <div class="match-header">
-                <span class="match-name">\${escapeHtml(match.name)}</span>
-                <span class="match-distance">出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
+            <div class="match-card" style="border: 3px solid #28a745; background-color: #f8fff9;">
+              <div style="background-color: #28a745; color: white; padding: 10px 15px; margin: -15px -15px 15px -15px; font-weight: bold;">
+                拼车伙伴：\${escapeHtml(match.name)}
+                <span style="float: right; font-weight: normal; font-size: 0.9em;">距离：出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
               </div>
               <div class="match-info">
                 <div>出发地：\${escapeHtml(match.departure_location_name)}</div>
                 <div>目的地：\${escapeHtml(match.destination_location_name)}</div>
                 <div>出发时间：\${escapeHtml(match.departure_date)} \${escapeHtml(match.departure_time)}</div>
               </div>
-              <div class="match-contact" style="display: inline-block; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 6px; padding: 8px 16px; margin-top: 12px;">
-                <strong>联系方式：\${escapeHtml(match.contact)}</strong>
+              <div class="match-contact" style="display: block; background-color: #ffe6e6; color: #cc0000; border: 2px solid #ff6666; border-radius: 6px; padding: 12px 16px; margin-top: 15px; font-size: 1.1em;">
+                <strong>对方联系方式：\${escapeHtml(match.contact)}</strong>
               </div>
             </div>
           \`).join('')}
@@ -1935,33 +1946,53 @@ const INDEX_HTML = `<!DOCTYPE html>
       // 没有已匹配的订单，显示所有未匹配的
       if (unmatchedTrips.length === 0) {
         container.innerHTML = \`
-          <div class="tip">
+          <div class="match-card" style="border: 3px solid #5b9bd5; background-color: #e7f2fa;">
+            <div style="background-color: #5b9bd5; color: white; padding: 10px 15px; margin: -15px -15px 15px -15px; font-weight: bold; font-size: 1.1em;">
+              我的行程信息
+            </div>
+            <div class="match-info">
+              <div>出发地：\${yourTrip ? escapeHtml(yourTrip.departure) : '-'}</div>
+              <div>目的地：\${yourTrip ? escapeHtml(yourTrip.destination) : '-'}</div>
+              <div>出发时间：\${yourTrip ? escapeHtml(yourTrip.time) : '-'}</div>
+            </div>
+          </div>
+          <div class="tip" style="margin-top: 20px;">
             暂无匹配的拼车信息，您的行程已发布，其他用户可以找到您！
-            \${yourTrip ? \`<p style="margin-top: 10px;">您的行程：\${escapeHtml(yourTrip.departure)} → \${escapeHtml(yourTrip.destination)} - \${escapeHtml(yourTrip.time)}</p>\` : ''}
           </div>
         \`;
         return;
       }
 
       container.innerHTML = \`
-        <h2 style="color: #8b4513; margin-bottom: 20px; border-bottom: 2px solid #c9a66b; padding-bottom: 10px;">
+        <div class="match-card" style="border: 3px solid #5b9bd5; background-color: #e7f2fa; margin-bottom: 30px;">
+          <div style="background-color: #5b9bd5; color: white; padding: 10px 15px; margin: -15px -15px 15px -15px; font-weight: bold; font-size: 1.1em;">
+            我的行程信息
+          </div>
+          <div class="match-info">
+            <div>出发地：\${yourTrip ? escapeHtml(yourTrip.departure) : '-'}</div>
+            <div>目的地：\${yourTrip ? escapeHtml(yourTrip.destination) : '-'}</div>
+            <div>出发时间：\${yourTrip ? escapeHtml(yourTrip.time) : '-'}</div>
+          </div>
+        </div>
+
+        <h2 style="color: #8b4513; margin-bottom: 20px; border-bottom: 3px solid #c9a66b; padding-bottom: 10px; font-size: 1.3em;">
           找到 \${unmatchedTrips.length} 个可能的拼车伙伴
         </h2>
         \${unmatchedTrips.map(match => \`
-          <div class="match-card">
-            <div class="match-header">
-              <span class="match-name">\${escapeHtml(match.name)}</span>
-              <span class="match-distance">出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
+          <div class="match-card" style="border: 2px solid #c9a66b; background-color: #fffef8;">
+            <div style="background-color: #f5f0e8; border-bottom: 2px solid #c9a66b; padding: 10px 15px; margin: -15px -15px 15px -15px; font-weight: bold;">
+              拼车伙伴：\${escapeHtml(match.name)}
+              <span style="float: right; color: #666; font-weight: normal; font-size: 0.9em;">距离：出发地 \${escapeHtml(match.departure_distance)}km · 目的地 \${escapeHtml(match.destination_distance)}km</span>
             </div>
             <div class="match-info">
               <div>出发地：\${escapeHtml(match.departure_location_name)}</div>
               <div>目的地：\${escapeHtml(match.destination_location_name)}</div>
               <div>出发时间：\${escapeHtml(match.departure_date)} \${escapeHtml(match.departure_time)}</div>
             </div>
-            <div class="match-contact">
-              联系方式：\${escapeHtml(match.contact)}
+            <div class="match-contact" style="background-color: #ffe6e6; color: #cc0000; border: 2px solid #ff6666; border-radius: 6px; padding: 12px 16px; margin-top: 15px; font-size: 1.1em;">
+              <strong>对方联系方式：\${escapeHtml(match.contact)}</strong>
             </div>
-            <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 10px; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+            <button class="confirm-match-btn" data-trip-id="\${match.id}" style="margin-top: 15px; padding: 10px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;">
               确认匹配
             </button>
           </div>
