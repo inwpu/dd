@@ -960,7 +960,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       <div class="form-group">
         <label for="contact">联系方式 *</label>
-        <input type="tel" id="contact" required placeholder="请输入手机号" pattern="[0-9]{11}" maxlength="11">
+        <input type="tel" id="contact" required placeholder="请输入手机号" maxlength="11">
         <small style="color: #666; display: block; margin-top: 5px;">
           支持移动/联通/电信/广电号码，建议开通"可通过手机号查找微信"功能
         </small>
@@ -1097,7 +1097,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
         <div class="form-group">
           <label for="queryPhone">手机号 *</label>
-          <input type="tel" id="queryPhone" required placeholder="请输入手机号" pattern="[0-9]{11}" maxlength="11">
+          <input type="tel" id="queryPhone" required placeholder="请输入手机号" maxlength="11">
         </div>
 
         <div class="tip">
