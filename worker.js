@@ -1746,14 +1746,12 @@ const INDEX_HTML = `<!DOCTYPE html>
     initDateTimePicker(null, null, null, 'queryEndHour', 'queryEndMinute', 7);
     initDateTimePicker('routeYear', 'routeMonth', 'routeDay', null, null, 7);
 
-    // 手机号验证（严格规则：验证四大运营商号段）
+    // 手机号验证（宽松但有效规则）
     function validatePhone(phone) {
-      // 中国移动：134-139, 147, 148, 150-152, 157-159, 165, 172, 178, 182-184, 187, 188, 195, 197, 198
-      // 中国联通：130-132, 145, 146, 155, 156, 166, 167, 171, 175, 176, 185, 186, 196
-      // 中国电信：133, 149, 153, 173, 174, 177, 180, 181, 189, 191, 193, 199
-      // 中国广电：192
-      // 虚拟运营商：162, 165, 167, 170, 171
-      const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
+      // 1开头，第二位3-9，总共11位
+      // 覆盖所有运营商：移动/联通/电信/广电/虚拟运营商（13x-19x号段）
+      // 自动兼容未来新号段
+      const phonePattern = /^1[3-9]\d{9}$/;
       return phonePattern.test(phone);
     }
 
@@ -3282,13 +3280,9 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
   }
 
-  // 验证手机号格式（严格规则：验证四大运营商号段）
-  // 中国移动：134-139, 147, 148, 150-152, 157-159, 165, 172, 178, 182-184, 187, 188, 195, 197, 198
-  // 中国联通：130-132, 145, 146, 155, 156, 166, 167, 171, 175, 176, 185, 186, 196
-  // 中国电信：133, 149, 153, 173, 174, 177, 180, 181, 189, 191, 193, 199
-  // 中国广电：192
-  // 虚拟运营商：162, 165, 167, 170, 171
-  const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
+  // 验证手机号格式（宽松但有效规则）
+  // 1开头，第二位3-9，总共11位（覆盖所有运营商13x-19x号段）
+  const phonePattern = /^1[3-9]\d{9}$/;
   if (!phonePattern.test(contact.trim())) {
     return jsonResponse({ error: '请输入有效的中国大陆手机号码' }, 400);
   }
@@ -3734,8 +3728,9 @@ async function handleMyTrips(request, env, ip) {
     return jsonResponse({ error: '缺少必要参数' }, 400);
   }
 
-  // 验证手机号格式（严格规则：验证四大运营商号段）
-  const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
+  // 验证手机号格式（宽松但有效规则）
+  // 1开头，第二位3-9，总共11位（覆盖所有运营商13x-19x号段）
+  const phonePattern = /^1[3-9]\d{9}$/;
   if (!phonePattern.test(phone.trim())) {
     return jsonResponse({ error: '请输入有效的中国大陆手机号码' }, 400);
   }
