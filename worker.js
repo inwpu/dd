@@ -960,9 +960,9 @@ const INDEX_HTML = `<!DOCTYPE html>
 
       <div class="form-group">
         <label for="contact">联系方式 *</label>
-        <input type="tel" id="contact" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
+        <input type="tel" id="contact" required placeholder="请输入手机号" pattern="[0-9]{11}" maxlength="11">
         <small style="color: #666; display: block; margin-top: 5px;">
-          请输入11位手机号码，建议开通"可通过手机号查找微信"功能
+          支持移动/联通/电信/广电号码，建议开通"可通过手机号查找微信"功能
         </small>
       </div>
 
@@ -1097,7 +1097,7 @@ const INDEX_HTML = `<!DOCTYPE html>
 
         <div class="form-group">
           <label for="queryPhone">手机号 *</label>
-          <input type="tel" id="queryPhone" required placeholder="请输入11位手机号" pattern="[0-9]{11}" maxlength="11">
+          <input type="tel" id="queryPhone" required placeholder="请输入手机号" pattern="[0-9]{11}" maxlength="11">
         </div>
 
         <div class="tip">
@@ -1746,9 +1746,14 @@ const INDEX_HTML = `<!DOCTYPE html>
     initDateTimePicker(null, null, null, 'queryEndHour', 'queryEndMinute', 7);
     initDateTimePicker('routeYear', 'routeMonth', 'routeDay', null, null, 7);
 
-    // 手机号验证（宽松规则：仅验证11位数字）
+    // 手机号验证（严格规则：验证四大运营商号段）
     function validatePhone(phone) {
-      const phonePattern = /^1[0-9]{10}$/; // 1开头的11位数字
+      // 中国移动：134-139, 147, 148, 150-152, 157-159, 165, 172, 178, 182-184, 187, 188, 195, 197, 198
+      // 中国联通：130-132, 145, 146, 155, 156, 166, 167, 171, 175, 176, 185, 186, 196
+      // 中国电信：133, 149, 153, 173, 174, 177, 180, 181, 189, 191, 193, 199
+      // 中国广电：192
+      // 虚拟运营商：162, 165, 167, 170, 171
+      const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
       return phonePattern.test(phone);
     }
 
@@ -1777,7 +1782,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       // 验证手机号
       const contact = document.getElementById('contact').value.trim();
       if (!validatePhone(contact)) {
-        showMessage('请输入正确的11位手机号（1开头）', 'error');
+        showMessage('请输入有效的中国大陆手机号码（支持移动/联通/电信/广电）', 'error');
         return;
       }
 
@@ -2333,7 +2338,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       }
 
       if (!validatePhone(phone)) {
-        showMessage('请输入正确的11位手机号', 'error');
+        showMessage('请输入有效的中国大陆手机号码（支持移动/联通/电信/广电）', 'error');
         return;
       }
 
@@ -3277,10 +3282,15 @@ async function handleCreateTrip(request, env, ip) {
     return jsonResponse({ error: '时间范围只能是30或60分钟' }, 400);
   }
 
-  // 验证手机号格式（宽松规则：1开头的11位数字）
-  const phonePattern = /^1\d{10}$/;
+  // 验证手机号格式（严格规则：验证四大运营商号段）
+  // 中国移动：134-139, 147, 148, 150-152, 157-159, 165, 172, 178, 182-184, 187, 188, 195, 197, 198
+  // 中国联通：130-132, 145, 146, 155, 156, 166, 167, 171, 175, 176, 185, 186, 196
+  // 中国电信：133, 149, 153, 173, 174, 177, 180, 181, 189, 191, 193, 199
+  // 中国广电：192
+  // 虚拟运营商：162, 165, 167, 170, 171
+  const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
   if (!phonePattern.test(contact.trim())) {
-    return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
+    return jsonResponse({ error: '请输入有效的中国大陆手机号码' }, 400);
   }
 
   // 计算时间戳（用户输入的是北京时间，需要转换为UTC时间戳）
@@ -3724,10 +3734,10 @@ async function handleMyTrips(request, env, ip) {
     return jsonResponse({ error: '缺少必要参数' }, 400);
   }
 
-  // 验证手机号格式
-  const phonePattern = /^1\d{10}$/;
+  // 验证手机号格式（严格规则：验证四大运营商号段）
+  const phonePattern = /^1(3[0-9]|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8[0-9]|9[0-35-9])\d{8}$/;
   if (!phonePattern.test(phone.trim())) {
-    return jsonResponse({ error: '请输入正确的11位手机号' }, 400);
+    return jsonResponse({ error: '请输入有效的中国大陆手机号码' }, 400);
   }
 
   // 生成 user_key
