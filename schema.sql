@@ -31,6 +31,11 @@ CREATE INDEX idx_trips_ip ON trips(ip);
 CREATE INDEX idx_trips_user_key ON trips(user_key);
 CREATE INDEX idx_trips_user_id ON trips(user_id);
 
+-- 复合索引优化查询性能
+CREATE INDEX idx_trips_duplicate_check ON trips(user_key, departure_date, departure_time, departure_timestamp);
+CREATE INDEX idx_trips_contact_time ON trips(contact, created_at);
+CREATE INDEX idx_trips_ip_time ON trips(ip, created_at);
+
 -- 访客统计表
 CREATE TABLE IF NOT EXISTS visitors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

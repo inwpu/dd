@@ -3329,6 +3329,24 @@ async function handleCreateTrip(request, env, ip) {
     }, 403);
   }
 
+  // 检查是否存在完全相同的订单（同一用户、同一出发地、同一目的地、同一时间）
+  const duplicateTrip = await env.DB.prepare(`
+    SELECT id FROM trips
+    WHERE user_key = ?
+      AND departure_location_name = ?
+      AND destination_location_name = ?
+      AND departure_date = ?
+      AND departure_time = ?
+      AND departure_timestamp > ?
+  `).bind(user_key, departure_location_name, destination_location_name, departure_date, departure_time, now).first();
+
+  if (duplicateTrip) {
+    return jsonResponse({
+      error: '订单重复请勿重复发单',
+      hint: '您已发布过相同的行程（相同出发地、目的地和时间）'
+    }, 400);
+  }
+
   // 生成地理网格和时间段
   const departureGrid = generateGrid(departure_lat, departure_lon);
   const destinationGrid = generateGrid(destination_lat, destination_lon);
@@ -3443,6 +3461,30 @@ async function handleMatch(request, env, ip) {
     ORDER BY departure_timestamp
   `).bind(minTime, maxTime, trip_id).all();
 
+  // 优化：一次性查询所有匹配记录，避免循环中查询
+  const allTripIds = trips.results ? trips.results.map(t => t.id) : [];
+  allTripIds.push(trip_id); // 加入当前用户的trip_id
+
+  let matchesMap = new Map();
+  if (allTripIds.length > 0) {
+    const allMatchRecords = await env.DB.prepare(`
+      SELECT trip_id_1, trip_id_2 FROM trip_matches
+      WHERE trip_id_1 IN (${allTripIds.join(',')}) OR trip_id_2 IN (${allTripIds.join(',')})
+    `).all();
+
+    // 构建匹配映射表
+    if (allMatchRecords.results) {
+      for (const record of allMatchRecords.results) {
+        matchesMap.set(`${record.trip_id_1}-${record.trip_id_2}`, true);
+        // 同时记录双向匹配关系
+        if (!matchesMap.has(record.trip_id_1)) matchesMap.set(record.trip_id_1, []);
+        if (!matchesMap.has(record.trip_id_2)) matchesMap.set(record.trip_id_2, []);
+        matchesMap.get(record.trip_id_1).push(record.trip_id_2);
+        matchesMap.get(record.trip_id_2).push(record.trip_id_1);
+      }
+    }
+  }
+
   // 两点一线匹配：使用智能匹配（距离 + 名称相似度）
   const matches = [];
   const currentTime = Date.now();
@@ -3464,16 +3506,11 @@ async function handleMatch(request, env, ip) {
       continue;
     }
 
-    // 检查对方是否已被匹配
-    const otherMatchRecord = await env.DB.prepare(
-      'SELECT * FROM trip_matches WHERE trip_id_1 = ? OR trip_id_2 = ?'
-    ).bind(trip.id, trip.id).first();
-
-    // 如果对方已被匹配，且不是匹配给当前用户，则跳过
-    if (otherMatchRecord) {
-      const isMatchedWithCurrentUser =
-        (otherMatchRecord.trip_id_1 === trip_id || otherMatchRecord.trip_id_2 === trip_id);
-
+    // 使用内存中的匹配映射表检查是否已被匹配
+    const tripMatches = matchesMap.get(trip.id);
+    if (Array.isArray(tripMatches) && tripMatches.length > 0) {
+      // 如果对方已被匹配，且不是匹配给当前用户，则跳过
+      const isMatchedWithCurrentUser = tripMatches.includes(trip_id);
       if (!isMatchedWithCurrentUser) {
         continue; // 跳过已被其他人匹配的行程
       }
@@ -3495,13 +3532,9 @@ async function handleMatch(request, env, ip) {
 
     // 必须同时满足：出发地匹配 且 目的地匹配
     if (departureMatch && destinationMatch) {
-      // 检查是否已匹配
+      // 使用内存中的映射表检查是否已匹配
       const [trip1, trip2] = trip_id < trip.id ? [trip_id, trip.id] : [trip.id, trip_id];
-      const matchRecord = await env.DB.prepare(
-        'SELECT * FROM trip_matches WHERE trip_id_1 = ? AND trip_id_2 = ?'
-      ).bind(trip1, trip2).first();
-
-      const isMatched = !!matchRecord;
+      const isMatched = matchesMap.has(`${trip1}-${trip2}`);
 
       // 不过滤已匹配的行程，全部加入matches数组
       matches.push({
@@ -3652,16 +3685,55 @@ async function handleMyTrips(request, env, ip) {
     });
   }
 
-  // 查询每个订单的匹配状态
-  const tripsWithStatus = await Promise.all(trips.results.map(async trip => {
-    // 查询该订单的匹配确认记录
-    const matches = await env.DB.prepare(`
-      SELECT * FROM trip_matches
-      WHERE trip_id_1 = ? OR trip_id_2 = ?
-    `).bind(trip.id, trip.id).all();
+  // 优化：使用单次JOIN查询获取所有匹配信息，避免N+1查询
+  const tripIds = trips.results.map(t => t.id);
 
-    const matchCount = matches.results ? matches.results.length : 0;
+  // 一次性查询所有匹配记录和匹配者信息
+  const allMatches = await env.DB.prepare(`
+    SELECT
+      tm.trip_id_1,
+      tm.trip_id_2,
+      tm.confirmed_at,
+      t.id as matched_trip_id,
+      t.name,
+      t.contact,
+      t.departure_location_name,
+      t.destination_location_name,
+      t.departure_date,
+      t.departure_time
+    FROM trip_matches tm
+    LEFT JOIN trips t ON (
+      (tm.trip_id_1 IN (${tripIds.join(',')}) AND t.id = tm.trip_id_2) OR
+      (tm.trip_id_2 IN (${tripIds.join(',')}) AND t.id = tm.trip_id_1)
+    )
+    WHERE tm.trip_id_1 IN (${tripIds.join(',')}) OR tm.trip_id_2 IN (${tripIds.join(',')})
+  `).all();
 
+  // 构建匹配映射表
+  const matchesMap = new Map();
+  if (allMatches.results) {
+    for (const match of allMatches.results) {
+      const ownerTripId = tripIds.includes(match.trip_id_1) ? match.trip_id_1 : match.trip_id_2;
+      if (!matchesMap.has(ownerTripId)) {
+        matchesMap.set(ownerTripId, []);
+      }
+      if (match.matched_trip_id) {
+        matchesMap.get(ownerTripId).push({
+          name: match.name,
+          contact: match.contact,
+          departure: match.departure_location_name,
+          destination: match.destination_location_name,
+          departure_date: match.departure_date,
+          departure_time: match.departure_time,
+          matched_at: match.confirmed_at
+        });
+      }
+    }
+  }
+
+  // 构建返回结果（无需额外查询）
+  const tripsWithStatus = trips.results.map(trip => {
+    const matchedUsers = matchesMap.get(trip.id) || [];
     return {
       id: trip.id,
       name: trip.name,
@@ -3670,11 +3742,12 @@ async function handleMyTrips(request, env, ip) {
       departure_date: trip.departure_date,
       departure_time: trip.departure_time,
       contact: trip.contact,
-      match_count: matchCount,
+      match_count: matchedUsers.length,
+      matched_users: matchedUsers,
       created_at: trip.created_at,
       is_expired: trip.departure_timestamp < Date.now()
     };
-  }));
+  });
 
   return jsonResponse({
     total: tripsWithStatus.length,
