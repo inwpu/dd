@@ -2379,36 +2379,71 @@ const INDEX_HTML = `<!DOCTYPE html>
           <h3 style="color: #8b4513; margin-bottom: 15px;">我的订单（共 \${escapeHtml(String(data.total))} 条）</h3>
 
           \${data.trips.map(trip => \`
-            <div style="padding: 15px; background: white; margin-bottom: 12px; border-radius: 6px; border: 1px solid #c9a66b; \${trip.is_expired ? 'opacity: 0.7;' : ''}">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="font-weight: bold; color: #8b4513;">订单 #\${escapeHtml(String(trip.id))}</div>
-                <div style="font-size: 0.9em; color: \${trip.is_expired ? '#999' : (trip.match_count > 0 ? '#007bff' : '#28a745')};">
-                  \${trip.is_expired ? '已过期' : (trip.match_count > 0 ? '已完成' : '进行中')}
+            <div style="padding: 0; background: white; margin-bottom: 20px; border-radius: 8px; border: 3px solid \${trip.match_count > 0 ? '#28a745' : '#c9a66b'}; overflow: hidden; \${trip.is_expired ? 'opacity: 0.7;' : ''}">
+
+              <!-- 订单标题 -->
+              <div style="background: \${trip.match_count > 0 ? '#28a745' : '#8b4513'}; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-weight: bold; font-size: 1.1em;">订单 #\${escapeHtml(String(trip.id))}</div>
+                <div style="font-size: 0.9em;">
+                  \${trip.is_expired ? '已过期' : (trip.match_count > 0 ? '已完成拼车' : '等待匹配')}
                 </div>
               </div>
 
-              <div style="margin-bottom: 8px;">
-                <strong>\${escapeHtml(trip.name)}</strong>
+              <!-- 我的行程信息 -->
+              <div style="padding: 15px; background: #f9f9f9; border-bottom: 2px solid #e0d0b0;">
+                <div style="font-weight: bold; color: #5b9bd5; margin-bottom: 10px; font-size: 1.05em;">我的行程信息</div>
+
+                <div style="margin-bottom: 6px;">
+                  <strong>姓名：</strong>\${escapeHtml(trip.name)}
+                </div>
+                <div style="color: #666; margin-bottom: 5px;">
+                  出发地：\${escapeHtml(trip.departure)}
+                </div>
+                <div style="color: #666; margin-bottom: 5px;">
+                  目的地：\${escapeHtml(trip.destination)}
+                </div>
+                <div style="color: #666; margin-bottom: 5px;">
+                  出发时间：\${escapeHtml(trip.departure_date)} \${escapeHtml(trip.departure_time)}
+                </div>
+                <div style="color: #666;">
+                  我的联系方式：\${escapeHtml(trip.contact)}
+                </div>
               </div>
 
-              <div style="color: #666; margin-bottom: 5px;">
-                出发地：\${escapeHtml(trip.departure)}
-              </div>
-              <div style="color: #666; margin-bottom: 5px;">
-                目的地：\${escapeHtml(trip.destination)}
-              </div>
-              <div style="color: #666; margin-bottom: 5px;">
-                出发时间：\${escapeHtml(trip.departure_date)} \${escapeHtml(trip.departure_time)}
-              </div>
-              <div style="color: #666; margin-bottom: 5px;">
-                联系方式：\${escapeHtml(trip.contact)}
-              </div>
+              <!-- 匹配者信息 -->
+              \${trip.matched_users && trip.matched_users.length > 0 ? \`
+                <div style="padding: 15px; background: #fff;">
+                  <div style="font-weight: bold; color: #28a745; margin-bottom: 12px; font-size: 1.05em; border-bottom: 2px solid #28a745; padding-bottom: 8px;">
+                    拼车伙伴信息（共\${trip.matched_users.length}人）
+                  </div>
 
-              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0d0b0;">
-                <span style="color: #8b4513;">
-                  匹配状态：\${trip.match_count > 0 ? '已完成拼车匹配' : '暂无匹配'}
-                </span>
-              </div>
+                  \${trip.matched_users.map(user => \`
+                    <div style="background: #f8fff9; border: 2px solid #d4edda; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+                      <div style="margin-bottom: 6px;">
+                        <strong>伙伴姓名：</strong>\${escapeHtml(user.name)}
+                      </div>
+                      <div style="color: #666; margin-bottom: 5px;">
+                        出发地：\${escapeHtml(user.departure)}
+                      </div>
+                      <div style="color: #666; margin-bottom: 5px;">
+                        目的地：\${escapeHtml(user.destination)}
+                      </div>
+                      <div style="color: #666; margin-bottom: 8px;">
+                        出发时间：\${escapeHtml(user.departure_date)} \${escapeHtml(user.departure_time)}
+                      </div>
+                      <div style="background: #ffe6e6; border: 2px solid #ff6666; border-radius: 4px; padding: 10px; margin-top: 8px;">
+                        <strong style="color: #cc0000; font-size: 1.05em;">对方联系方式：\${escapeHtml(user.contact)}</strong>
+                      </div>
+                    </div>
+                  \`).join('')}
+                </div>
+              \` : \`
+                <div style="padding: 15px; background: #fff;">
+                  <div style="color: #999; text-align: center; padding: 10px;">
+                    暂无匹配，您的行程已发布，等待其他用户匹配
+                  </div>
+                </div>
+              \`}
             </div>
           \`).join('')}
 
