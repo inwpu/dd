@@ -7,7 +7,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>西安大学生拼车平台 v2.0</title>
+  <title>西安大学生拼车平台</title>
   <style>
     * {
       margin: 0;
@@ -878,8 +878,7 @@ const INDEX_HTML = `<!DOCTYPE html>
       <div class="notice-title">平台说明</div>
       <p>本平台为西安地区大学生提供免费拼车信息匹配服务，帮助同学们找到同路出行的伙伴，降低出行成本。</p>
       <p style="margin-top: 8px;"><strong>数据保留政策：</strong>行程信息仅保留未来7天（从行程当天起算），7天后数据将自动清理。请勿录入7天后的行程，系统将自动拒绝。</p>
-      <p style="margin-top: 8px;"><strong>隐私提示：</strong>只有发布行程的用户才能查看其他人的联系方式，仅查询不会显示联系方式。</p>
-      <p style="margin-top: 8px;"><strong>订单查询说明：</strong>为了保护您的隐私，“我的订单”仅能在您发布行程时所使用的同一浏览器/设备上查询；更换浏览器、手机或电脑后无法查看之前的订单记录。</p>
+      <p style="margin-top: 8px;"><strong>隐私提示：</strong>隐私提示：为保护用户信息安全，只有发布行程的同学才能查看匹配到的联系方式；同时，“我的订单”仅能在您发布行程时所使用的同一浏览器/设备上查询，更换设备后无法查看之前的订单记录</p>
       <p style="margin-top: 8px;"><strong>安全提醒：</strong>请同学们不要乘坐来历不明的车辆，确认安全后再上车，并把行程或定位发给信任的亲友，让他们放心。</p>   
       <p style="margin-top: 8px;"><strong>匹配规则：</strong></p>
       <ul style="margin-left: 20px; margin-top: 5px;">
