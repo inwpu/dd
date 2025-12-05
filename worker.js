@@ -4,7 +4,10 @@ const INDEX_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>西安大学生拼车平台</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>西安大学生拼车平台 v2.0</title>
   <style>
     * {
       margin: 0;
@@ -1180,6 +1183,11 @@ const INDEX_HTML = `<!DOCTYPE html>
   </script>
 
   <script>
+    // 版本信息（强制刷新缓存）
+    const VERSION = '2.0.1-20251205';
+    console.log('🚀 西安拼车平台', VERSION);
+    console.log('✅ 手机号验证已更新：支持所有13x-19x号段');
+
     // 使用当前域名，避免跨域问题
     const API_BASE = window.location.origin;
     const SITE_START_DATE = '2025-12-01 00:00:00'; // 网站开始运行日期，请自行修改
@@ -1751,8 +1759,18 @@ const INDEX_HTML = `<!DOCTYPE html>
       // 1开头，第二位3-9，总共11位
       // 覆盖所有运营商：移动/联通/电信/广电/虚拟运营商（13x-19x号段）
       // 自动兼容未来新号段
-      const phonePattern = /^1[3-9]\d{9}$/;
-      return phonePattern.test(phone);
+      const phonePattern = /^1[3-9]\\d{9}$/;
+      const result = phonePattern.test(phone);
+
+      // 调试输出
+      console.log('手机号验证:', {
+        input: phone,
+        length: phone.length,
+        pattern: phonePattern.toString(),
+        result: result
+      });
+
+      return result;
     }
 
     // 表单提交
